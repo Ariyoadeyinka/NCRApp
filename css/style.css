@@ -1,0 +1,132 @@
+ .navbar {
+     box-shadow: 0 2px 8px rgba(0, 0, 0, .06);
+     border-bottom: 1px solid var(--bs-border-color);
+ }
+
+ .nav-btn {
+     border: none;
+     border-radius: 6px;
+     font-weight: 500;
+     padding: 8px;
+     color: #0C2340;
+ }
+
+ .nav-btn:hover {
+     background-color: #e3f2fd;
+     color: #0C2340;
+ }
+
+ .nav-btn.active {
+     background-color: #0C2340;
+     border-color: #0C2340;
+     color: #fff;
+ }
+
+ .brand-divider {
+     opacity: .5;
+ }
+
+ .dropdown.show>.nav-link::after {
+     content: "";
+     position: absolute;
+     left: 50%;
+     transform: translateX(-50%) rotate(45deg);
+     bottom: -9px;
+     width: 10px;
+     height: 10px;
+     background: var(--bs-body-bg);
+     border-left: 1px solid var(--bs-border-color);
+     border-top: 1px solid var(--bs-border-color);
+     z-index: 1001;
+ }
+
+ @media (min-width: 768px) {
+     .dropdown-hover:hover .dropdown-menu {
+         display: block;
+         margin-top: 0;
+     }
+ }
+
+ .description-header {
+     text-align: center;
+     margin-top: 50px;
+     width: 70%;
+     margin: auto;
+ }
+
+ .description-header h1 {
+     color: #0C2340;
+     font-weight: 700;
+ }
+
+ .description-header p {
+     font-size: 22px;
+ }
+
+ .status-box {
+     background: #fff;
+     border-color: #e5e7eb;
+     box-shadow: 0 2px 10px rgba(0, 0, 0, .04);
+ }
+
+ .status-box:hover {
+     box-shadow: 0 0px 10px rgba(0, 0, 0, .2);
+ }
+
+ .status-value {
+     color: #0C2340;
+     font-weight: 700;
+     line-height: 1;
+ }
+
+ .status-icon-clock {
+     width: 44px;
+     height: 44px;
+     background: #fefce8;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+ }
+
+ .status-icon-clock i {
+     color: #d28b09;
+ }
+
+ .status-icon-check {
+     width: 44px;
+     height: 44px;
+     background: #f0fdf4;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+ }
+
+ .status-icon-check i {
+     color: #14ad4d;
+ }
+
+ .status-icon-exclaimation {
+     width: 44px;
+     height: 44px;
+     background: #fef2f2;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+ }
+
+ .status-icon-exclaimation i {
+     color: #e80711;
+ }
+
+ .status-icon-file {
+     width: 44px;
+     height: 44px;
+     background: #e3f2fd;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+ }
+
+ .status-icon-file i {
+     color: #0C2340;
+ }
