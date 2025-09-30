@@ -8,7 +8,7 @@
      border-radius: 6px;
      font-weight: 500;
      padding: 8px;
-     color: #0C2340;
+     color: #173451;
  }
 
  .nav-btn:hover {
@@ -17,8 +17,8 @@
  }
 
  .nav-btn.active {
-     background-color: #0C2340;
-     border-color: #0C2340;
+     background-color: #173451;
+     border-color: #173451;
      color: #fff;
  }
 
@@ -55,7 +55,7 @@
  }
 
  .description-header h1 {
-     color: #0C2340;
+     color: #173451;
      font-weight: 700;
  }
 
@@ -74,7 +74,7 @@
  }
 
  .status-value {
-     color: #0C2340;
+     color: #173451;
      font-weight: 700;
      line-height: 1;
  }
@@ -128,5 +128,111 @@
  }
 
  .status-icon-file i {
-     color: #0C2340;
+     color: #173451;
  }
+ .Create-Ncr{ 
+     display: flex;
+    justify-content: center; 
+    align-items: center; 
+ }
+ .create-ncr-button{
+    width: 90%;
+    background-color: #173451;
+    color: white;
+    border: 1px solid #173451;
+    border-radius: 10px;
+    padding: 20px;
+}
+.recent-ncrs {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  font-family: Arial, sans-serif;
+  margin-top: 50px;
+}
+
+.ncr-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  color: #173451;
+}
+
+.ncr-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.ncr-subtitle {
+  display: block;
+  font-size: 13px;
+  font-weight: normal;
+  color: #666;
+}
+
+.view-all {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 6px 12px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.ncr-item {
+  display: flex;
+  align-items: center;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  justify-content: space-between;
+}
+
+.ncr-code {
+  font-weight: bold;
+  margin-right: 10px;
+  min-width: 150px;
+}
+
+.ncr-details {
+  flex: 1;
+  font-size: 14px;
+  color: #444;
+}
+
+.ncr-status {
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+@media (max-width: 640px) {
+  .ncr-item {
+    flex-direction: column;  
+    align-items: flex-start;
+  }
+  .ncr-status {
+    align-self: flex-end;     
+    margin-top: 6px;
+  }
+}
+
+.recent-ncrs .ncr-item + .ncr-item {
+  margin-top: 10px;
+}
+/* Status Colors */
+.open { color: #d9534f; }
+.ncr-status.open { background: #d9534f; color: white}
+
+.closed { color: #28a745; }
+.ncr-status.closed { background: #28a745; color: white}
+
+.pending { color: #f0ad4e; }
+.ncr-status.pending { background: #f0ad4e; color: white}
