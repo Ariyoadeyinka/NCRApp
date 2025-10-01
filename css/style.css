@@ -236,3 +236,23 @@
 
 .pending { color: #f0ad4e; }
 .ncr-status.pending { background: #f0ad4e; color: white}
+.ncr-code {
+    font-size: 13px;
+}
+.ncr-details strong{
+    font-weight: 500;
+    color: #173451;
+}
+.ncr-details{
+    color: gray;
+}
+.ncr-status{
+    margin-right: 5px;
+}
+.ncr-item button{
+    background-color: white;
+    border: none;
+}
+.ncr-item{
+    margin-bottom: 20px;
+}
