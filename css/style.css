@@ -356,10 +356,17 @@
 
 
  /* CREATE NCR */
+ :root {
+     --cf-brand: #173451;
+     --cf-border: #8fb7db;
+     --cf-border-soft: #e6eaef;
+     --cf-invalid: #dc3545;
+ }
+
 
  .cf-card {
-     border: 1px solid #e6eaef;
-     border-radius: 12px
+     border: 1px solid var(--cf-border-soft);
+     border-radius: 12px;
  }
 
  .form-select.form-select-lg,
@@ -367,30 +374,64 @@
  .form-control.bg-body-tertiary,
  textarea.form-control.bg-body-tertiary {
      border-radius: 10px;
-     background: #f5f8fc !important
+     background: #fff !important;
  }
 
- 
+ .cf-form .form-control,
+ .cf-form .form-select,
+ .cf-form textarea {
+     border-color: var(--cf-border);
+     background-color: #fff !important;
+     box-shadow: none;
+     transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+     color: #0C2340;
+ }
+
+
+ .cf-form .form-control:focus,
+ .cf-form .form-select:focus,
+ .cf-form textarea:focus {
+     border-color: var(--cf-brand) !important;
+     box-shadow: 0 0 0 .15rem color-mix(in srgb, var(--cf-brand) 15%, transparent);
+     background-color: #fff !important;
+     color: #0C2340;
+ }
+
+
+ .cf-form.show-validation :invalid {
+     border-color: var(--cf-invalid) !important;
+     box-shadow: 0 0 0 .12rem color-mix(in srgb, var(--cf-invalid) 15%, transparent);
+     background-color: #fff !important;
+ }
+
+
+ .cf-form.show-validation :valid {
+     border-color: var(--cf-border);
+     box-shadow: none;
+     background-color: #fff !important;
+ }
+
+
  .cf-view {
-     display: none
+     display: none;
  }
 
 
  html:not(:has(:target)) #step1 {
-     display: block
+     display: block;
  }
 
- 
+
  html:has(#step1:target) #step1 {
-     display: block
+     display: block;
  }
 
  html:has(#step2:target) #step2 {
-     display: block
+     display: block;
  }
 
  html:has(#step3:target) #step3 {
-     display: block
+     display: block;
  }
 
 
@@ -399,28 +440,27 @@
  #step3:target .cf-form textarea {
      pointer-events: none;
      background: #fff !important;
-     border-color: #e6eaef
+     border-color: var(--cf-border-soft);
  }
 
  #step3:target .cf-form .btn-group,
  #step3:target .cf-form .form-check {
      pointer-events: none;
-     opacity: .9
+     opacity: .9;
  }
-
 
  .cf-stepper {
      display: flex;
      align-items: center;
      gap: 18px;
-     justify-content: center
+     justify-content: center;
  }
 
  .cf-stepper-item {
      display: flex;
      align-items: center;
      gap: 8px;
-     white-space: nowrap
+     white-space: nowrap;
  }
 
  .cf-stepper-line {
@@ -429,12 +469,12 @@
      background: #d7dee8;
      border-radius: 2px;
      opacity: .9;
-     translate: 0 -1px
+     translate: 0 -1px;
  }
 
  .cf-stepper-label {
      font-weight: 600;
-     color: #5a6a83
+     color: #5a6a83;
  }
 
  .cf-step-icon {
@@ -447,98 +487,73 @@
      border: 2px solid #cfd7e3;
      color: #6b7a90;
      background: #fff;
-     font-size: 16px
+     font-size: 16px;
+     transition: background .15s ease, color .15s ease, border-color .15s ease;
  }
 
-
-
- html:not(:has(:target)) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-label {
-     color: #173451
+ html:not(:has(:target)) .cf-stepper :nth-child(1).cf-stepper-item .cf-stepper-label {
+     color: var(--cf-brand);
  }
 
- html:not(:has(:target)) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-step-icon {
-     background: #173451;
+ html:not(:has(:target)) .cf-stepper :nth-child(1).cf-stepper-item .cf-step-icon {
+     background: var(--cf-brand);
      color: #fff;
-     border-color: #173451
+     border-color: var(--cf-brand);
  }
 
- 
- html:has(#step1:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-label {
-     color: #173451
+ html:has(#step1:target) .cf-stepper :nth-child(1).cf-stepper-item .cf-stepper-label {
+     color: var(--cf-brand);
  }
 
- html:has(#step1:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-icon {
-     background: #173451;
+ html:has(#step1:target) .cf-stepper :nth-child(1).cf-stepper-item .cf-step-icon {
+     background: var(--cf-brand);
      color: #fff;
-     border-color: #173451
+     border-color: var(--cf-brand);
  }
 
- 
- html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-label {
-     color: #19a16a
+ html:has(#step2:target) .cf-stepper :nth-child(3).cf-stepper-item .cf-stepper-label {
+     color: var(--cf-brand);
  }
 
- html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-icon {
-     background: #19a16a;
+ html:has(#step2:target) .cf-stepper :nth-child(3).cf-stepper-item .cf-step-icon {
+     background: var(--cf-brand);
      color: #fff;
-     border-color: #19a16a
+     border-color: var(--cf-brand);
  }
 
- html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(2) .cf-stepper-label {
-     color: #173451
+ html:has(#step3:target) .cf-stepper :nth-child(5).cf-stepper-item .cf-stepper-label {
+     color: var(--cf-brand);
  }
 
- html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(2) .cf-stepper-icon {
-     background: #173451;
+ html:has(#step3:target) .cf-stepper :nth-child(5).cf-stepper-item .cf-step-icon {
+     background: var(--cf-brand);
      color: #fff;
-     border-color: #173451
- }
-
- 
- html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(-n+2) .cf-stepper-label {
-     color: #19a16a
- }
-
- html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(-n+2) .cf-stepper-icon {
-     background: #19a16a;
-     color: #fff;
-     border-color: #19a16a
- }
-
- html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(3) .cf-stepper-label {
-     color: #173451
- }
-
- html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(3) .cf-stepper-icon {
-     background: #173451;
-     color: #fff;
-     border-color: #173451
+     border-color: var(--cf-brand);
  }
 
 
  .cf-supplier-field .cf-add-new {
-     display: none
+     display: none;
  }
 
  .cf-supplier-field select:has(option[value="add_new"]:checked)+.cf-add-new {
-     display: block
+     display: block;
  }
 
  .cf-supplier-field .form-select {
      border-radius: 10px;
-     background: #f7f9fc
+     background: #f7f9fc;
  }
 
  .cf-supplier-field .input-group-text {
      background: #f7f9fc;
-     border-right: 0
+     border-right: 0;
  }
 
  .cf-supplier-field .form-control {
-     border-left: 0
+     border-left: 0;
  }
 
- 
  .cf-tip {
      position: relative;
      display: inline-grid;
@@ -547,11 +562,11 @@
      height: 22px;
      border-radius: 50%;
      background: #eef3f8;
-     color: #173451;
+     color: var(--cf-brand);
      border: 1px solid #e6eaef;
      font: 700 13px/1 system-ui;
      cursor: pointer;
-     user-select: none
+     user-select: none;
  }
 
  .cf-tip::after {
@@ -572,7 +587,7 @@
      opacity: 0;
      visibility: hidden;
      transform: translateY(4px);
-     transition: opacity .18s, transform .18s, visibility 0s .18s
+     transition: opacity .18s, transform .18s, visibility 0s .18s;
  }
 
  .cf-tip::before {
@@ -582,74 +597,102 @@
      left: 16px;
      width: 10px;
      height: 10px;
-     background: #173451;
+     background: var(--cf-brand);
      transform: rotate(45deg);
      border-radius: 2px;
      opacity: 0;
-     transition: opacity .18s
+     transition: opacity .18s;
  }
 
  .cf-tip:hover::after,
  .cf-tip:focus-visible::after {
      opacity: 1;
      visibility: visible;
-     transform: translateY(0)
+     transform: translateY(0);
  }
 
  .cf-tip:hover::before,
  .cf-tip:focus-visible::before {
-     opacity: 1
+     opacity: 1;
  }
 
  .cf-tip.drop-left::after {
      left: auto;
-     right: 28px
+     right: 28px;
  }
 
  .cf-tip.drop-left::before {
      left: auto;
-     right: 16px
+     right: 16px;
  }
 
- 
  .btn-primary {
-     background: #173451;
-     border-color: #173451
+     background: var(--cf-brand);
+     border-color: var(--cf-brand);
  }
 
  .btn-primary:hover {
      background: #122a3f;
-     border-color: #122a3f
+     border-color: #122a3f;
  }
 
  .btn-outline-secondary {
      border-color: #e6eaef;
-     color: #213048
+     color: #213048;
  }
 
  .btn-outline-secondary:hover {
      background: #eef3f9;
      border-color: #8fb7db;
-     color: #173451
+     color: var(--cf-brand);
  }
 
  .cf-wide {
      min-width: 280px;
-     padding-inline: 28px
+     padding-inline: 28px;
  }
 
- .cf-block-quality{
-    margin-top: 30px;
+ .cf-block-quality {
+     margin-top: 30px;
  }
- .create-ncr-main{
-    color: #0C2340;
+
+ .create-ncr-main {
+     color: #0C2340;
  }
+
+
  @media (max-width:768px) {
      .cf-stepper {
-         gap: 12px
+         gap: 12px;
      }
 
      .cf-stepper-line {
-         flex-basis: 36px
+         flex-basis: 36px;
      }
+ }
+
+ input.is-invalid,
+ select.is-invalid,
+ textarea.is-invalid {
+     border-color: #dc3545 !important;
+     box-shadow: 0 0 0 0.1rem rgba(220, 53, 69, 0.25);
+ }
+
+ .cf-error {
+     font-size: 0.85rem;
+     color: #dc3545;
+ }
+
+ input,
+ select,
+ textarea {
+     border: 1px solid #17345120;
+     background-color: white !important;
+ }
+
+ input:focus,
+ select:focus,
+ textarea:focus {
+     border-color: #173451 !important;
+     box-shadow: 0 0 0 0.15rem rgba(23, 52, 81, 0.25);
  }
