@@ -353,3 +353,303 @@
          margin-bottom: 0;
      }
  }
+
+
+ /* CREATE NCR */
+
+ .cf-card {
+     border: 1px solid #e6eaef;
+     border-radius: 12px
+ }
+
+ .form-select.form-select-lg,
+ .form-control.form-control-lg,
+ .form-control.bg-body-tertiary,
+ textarea.form-control.bg-body-tertiary {
+     border-radius: 10px;
+     background: #f5f8fc !important
+ }
+
+ 
+ .cf-view {
+     display: none
+ }
+
+
+ html:not(:has(:target)) #step1 {
+     display: block
+ }
+
+ 
+ html:has(#step1:target) #step1 {
+     display: block
+ }
+
+ html:has(#step2:target) #step2 {
+     display: block
+ }
+
+ html:has(#step3:target) #step3 {
+     display: block
+ }
+
+
+ #step3:target .cf-form .form-control,
+ #step3:target .cf-form .form-select,
+ #step3:target .cf-form textarea {
+     pointer-events: none;
+     background: #fff !important;
+     border-color: #e6eaef
+ }
+
+ #step3:target .cf-form .btn-group,
+ #step3:target .cf-form .form-check {
+     pointer-events: none;
+     opacity: .9
+ }
+
+
+ .cf-stepper {
+     display: flex;
+     align-items: center;
+     gap: 18px;
+     justify-content: center
+ }
+
+ .cf-stepper-item {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     white-space: nowrap
+ }
+
+ .cf-stepper-line {
+     flex: 0 0 56px;
+     height: 2px;
+     background: #d7dee8;
+     border-radius: 2px;
+     opacity: .9;
+     translate: 0 -1px
+ }
+
+ .cf-stepper-label {
+     font-weight: 600;
+     color: #5a6a83
+ }
+
+ .cf-step-icon {
+     width: 34px;
+     height: 34px;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     border: 2px solid #cfd7e3;
+     color: #6b7a90;
+     background: #fff;
+     font-size: 16px
+ }
+
+
+
+ html:not(:has(:target)) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-label {
+     color: #173451
+ }
+
+ html:not(:has(:target)) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-step-icon {
+     background: #173451;
+     color: #fff;
+     border-color: #173451
+ }
+
+ 
+ html:has(#step1:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-label {
+     color: #173451
+ }
+
+ html:has(#step1:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-icon {
+     background: #173451;
+     color: #fff;
+     border-color: #173451
+ }
+
+ 
+ html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-label {
+     color: #19a16a
+ }
+
+ html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(1) .cf-stepper-icon {
+     background: #19a16a;
+     color: #fff;
+     border-color: #19a16a
+ }
+
+ html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(2) .cf-stepper-label {
+     color: #173451
+ }
+
+ html:has(#step2:target) .cf-stepper .cf-stepper-item:nth-of-type(2) .cf-stepper-icon {
+     background: #173451;
+     color: #fff;
+     border-color: #173451
+ }
+
+ 
+ html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(-n+2) .cf-stepper-label {
+     color: #19a16a
+ }
+
+ html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(-n+2) .cf-stepper-icon {
+     background: #19a16a;
+     color: #fff;
+     border-color: #19a16a
+ }
+
+ html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(3) .cf-stepper-label {
+     color: #173451
+ }
+
+ html:has(#step3:target) .cf-stepper .cf-stepper-item:nth-of-type(3) .cf-stepper-icon {
+     background: #173451;
+     color: #fff;
+     border-color: #173451
+ }
+
+
+ .cf-supplier-field .cf-add-new {
+     display: none
+ }
+
+ .cf-supplier-field select:has(option[value="add_new"]:checked)+.cf-add-new {
+     display: block
+ }
+
+ .cf-supplier-field .form-select {
+     border-radius: 10px;
+     background: #f7f9fc
+ }
+
+ .cf-supplier-field .input-group-text {
+     background: #f7f9fc;
+     border-right: 0
+ }
+
+ .cf-supplier-field .form-control {
+     border-left: 0
+ }
+
+ 
+ .cf-tip {
+     position: relative;
+     display: inline-grid;
+     place-items: center;
+     width: 22px;
+     height: 22px;
+     border-radius: 50%;
+     background: #eef3f8;
+     color: #173451;
+     border: 1px solid #e6eaef;
+     font: 700 13px/1 system-ui;
+     cursor: pointer;
+     user-select: none
+ }
+
+ .cf-tip::after {
+     content: attr(data-tip);
+     position: absolute;
+     z-index: 40;
+     top: -6px;
+     left: 28px;
+     min-width: 220px;
+     max-width: 420px;
+     padding: 10px 12px;
+     border-radius: 10px;
+     background: #fff;
+     border: 1px solid #e6eaef;
+     color: #0f2440;
+     font-size: 14px;
+     box-shadow: 0 12px 28px rgba(16, 30, 54, .15);
+     opacity: 0;
+     visibility: hidden;
+     transform: translateY(4px);
+     transition: opacity .18s, transform .18s, visibility 0s .18s
+ }
+
+ .cf-tip::before {
+     content: "";
+     position: absolute;
+     top: 16px;
+     left: 16px;
+     width: 10px;
+     height: 10px;
+     background: #173451;
+     transform: rotate(45deg);
+     border-radius: 2px;
+     opacity: 0;
+     transition: opacity .18s
+ }
+
+ .cf-tip:hover::after,
+ .cf-tip:focus-visible::after {
+     opacity: 1;
+     visibility: visible;
+     transform: translateY(0)
+ }
+
+ .cf-tip:hover::before,
+ .cf-tip:focus-visible::before {
+     opacity: 1
+ }
+
+ .cf-tip.drop-left::after {
+     left: auto;
+     right: 28px
+ }
+
+ .cf-tip.drop-left::before {
+     left: auto;
+     right: 16px
+ }
+
+ 
+ .btn-primary {
+     background: #173451;
+     border-color: #173451
+ }
+
+ .btn-primary:hover {
+     background: #122a3f;
+     border-color: #122a3f
+ }
+
+ .btn-outline-secondary {
+     border-color: #e6eaef;
+     color: #213048
+ }
+
+ .btn-outline-secondary:hover {
+     background: #eef3f9;
+     border-color: #8fb7db;
+     color: #173451
+ }
+
+ .cf-wide {
+     min-width: 280px;
+     padding-inline: 28px
+ }
+
+ .cf-block-quality{
+    margin-top: 30px;
+ }
+ .create-ncr-main{
+    color: #0C2340;
+ }
+ @media (max-width:768px) {
+     .cf-stepper {
+         gap: 12px
+     }
+
+     .cf-stepper-line {
+         flex-basis: 36px
+     }
+ }
