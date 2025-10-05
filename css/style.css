@@ -353,3 +353,61 @@
          margin-bottom: 0;
      }
  }
+
+
+ body {
+      background-color: #f8f9fa;
+    }
+
+    .main-title {
+      color: #0d3b66; /* Dark navy blue */
+      font-weight: 700;
+    }
+
+    .ncr-box {
+      background-color: white;
+      border: 1px solid #dee2e6;
+      border-radius: 15px;
+      padding: 2rem;
+    }
+
+    .badge-open {
+      background-color: #f8d7da;
+      color: #721c24;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    .badge-high {
+      background-color: #fd7e14;
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    .action-buttons {
+      text-align: right;
+    }
+
+    .ncr-box {
+  background-color: white;
+  border: 1px solid #dee2e6;
+  border-radius: 15px;
+  padding: 2rem;
+}
+
+.custom-badge {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.card {
+  max-width: 100%;
+}
+
+
+  
