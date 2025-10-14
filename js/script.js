@@ -28,7 +28,6 @@
     return created[0].id;
   }
 
-  // Insert a new NCR (used when submitting directly without an existing draft)
   async function insertNcr(body) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs`, {
       method: "POST",
@@ -40,8 +39,6 @@
     return data[0];
   }
 
-  // Save a draft (status: pending). Partial fields allowed.
-// api.js
 async function saveDraft(partial) {
   const payload = { ...partial };
   if (!payload.status) payload.status = "pending";
@@ -81,8 +78,6 @@ async function updateNcr(id, patch) {
   return (data && data[0]) || null;
 }
 
-
-  // Patch existing NCR
   async function updateNcr(id, patch) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`, {
       method: "PATCH",
@@ -99,7 +94,6 @@ async function updateNcr(id, patch) {
     return rows[0];
   }
 
-  // Get a single NCR by id (for Continue flow)
   async function getNcrById(id) {
     const params = new URLSearchParams({
       select: "id,ncr_no,status,product_no,so_no,date_raised,date_closed,wip,defect_desc,is_nc,qty_supplied,qty_defective,rep_name,supplier_id",
@@ -124,7 +118,6 @@ async function updateNcr(id, patch) {
     return data[0];
   }
 
-  // expose
   window.NCR = window.NCR || {};
   window.NCR.api = {
     BASE_URL: SUPABASE_URL,

@@ -162,7 +162,8 @@
                             </div>
                         </fieldset>
                         <div class="cf-actions cf-actions-ncr d-flex justify-content-between mt-4">
-                            <button type="button" class="btn btn-save">Save</button>
+                            <button type="button" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i>
+                                Save</button>
                             <a href="#step2" class="btn btn-primary" id="toStep2">Next <i
                                     class="fa-solid fa-arrow-right-long ms-1"></i></a>
                         </div>
@@ -245,7 +246,8 @@
                                 <a href="#step1" class="btn btn-outline-secondary" id="backToStep1">
                                     <i class="fa-solid fa-arrow-left-long me-1"></i> Back
                                 </a>
-                                <button type="button" class="btn btn-save">Save</button>
+                                <button type="button" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i>
+                                    Save</button>
                                 <a href="index.html" class="btn btn-light">Cancel</a>
                             </div>
                             <div class="d-flex order-2 ms-md-auto">
@@ -341,7 +343,8 @@
                                 <a href="#step2" class="btn btn-outline-secondary" id="backToStep1">
                                     <i class="fa-solid fa-arrow-left-long me-1"></i> Back
                                 </a>
-                                <button type="button" class="btn btn-save">Save</button>
+                                <button type="button" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i>
+                                    Save</button>
                                 <a href="index.html" class="btn btn-light">Cancel</a>
                             </div>
                             <div class="d-flex order-2 ms-md-auto">
@@ -357,6 +360,36 @@
             </div>
         </section>
     </main>
+    <div class="modal fade" id="cfConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-3">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cfConfirmTitle">Please confirm</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="cfConfirmBody">Are you sure?</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="cfConfirmYesBtn">Yes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="cfSuccessModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-3">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cfSuccessTitle">Success</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="cfSuccessBody">Your action completed successfully.</div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <footer class="app-footer">
         <div class="footer-left">

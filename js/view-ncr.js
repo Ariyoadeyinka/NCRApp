@@ -1,4 +1,3 @@
-// js/view-ncr.js
 (function () {
   const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
   const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
@@ -73,7 +72,6 @@ function stageLabel(s) {
 }
 
 function computeNextDept(n) {
-  // prefer DB-provided next_up_dept; otherwise compute from current_stage
   const next = (n.next_up_dept || "").toLowerCase();
   if (next) return next;
   const cur = String(n.current_stage || "").toLowerCase();
@@ -87,12 +85,11 @@ function nextDeptBadge(n) {
   const s = String(n.status || "").toLowerCase();
   const isDraft = (s === "pending" || s === "draft");
   const isClosed = (s === "closed");
-  if (isDraft || isClosed) return ""; // hide on drafts/closed
+  if (isDraft || isClosed) return ""; 
 
   const dept = computeNextDept(n);
-  if (!dept || dept === "closed") return ""; // nothing after Operations
+  if (!dept || dept === "closed") return ""; 
 
-  // Pick a Bootstrap look per department
   const looks = {
     quality:     "bg-info text-dark",
     engineering: "bg-primary",
@@ -116,7 +113,6 @@ function renderCard(n) {
   const isDraft  = (s === "pending" || s === "draft");
   const isClosed = (s === "closed");
 
-  // Build the 'Next Dept' badge
   const nextBadge = nextDeptBadge(n);
 
   return `
@@ -242,7 +238,6 @@ function renderCard(n) {
       } else if (action === "edit") {
         alert("Edit action clicked (implement navigation).");
       }
-      // no handler needed for "continue" since it's an <a> link
     });
   });
 })();

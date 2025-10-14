@@ -6,6 +6,40 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   const getQuery = (k) => new URL(location.href).searchParams.get(k);
 
+  // ---- Modal helpers (reusable) ----
+  function showConfirmModal(title, body, yesLabel) {
+    return new Promise(function (resolve) {
+      var el = document.getElementById("cfConfirmModal");
+      var m = bootstrap.Modal.getOrCreateInstance(el);
+      document.getElementById("cfConfirmTitle").textContent = title || "Please confirm";
+      document.getElementById("cfConfirmBody").textContent = body || "Are you sure?";
+      var yesBtn = document.getElementById("cfConfirmYesBtn");
+      yesBtn.textContent = yesLabel || "Yes";
+      // clean old handlers
+      var newYesBtn = yesBtn.cloneNode(true);
+      yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
+
+      newYesBtn.addEventListener("click", function () {
+        m.hide();
+        resolve(true);
+      });
+      el.addEventListener("hidden.bs.modal", function onHide() {
+        el.removeEventListener("hidden.bs.modal", onHide);
+        resolve(false); // if closed without clicking Yes
+      }, { once: true });
+
+      m.show();
+    });
+  }
+
+  function showSuccessModal(title, body) {
+    var el = document.getElementById("cfSuccessModal");
+    var m = bootstrap.Modal.getOrCreateInstance(el);
+    document.getElementById("cfSuccessTitle").textContent = title || "Success";
+    document.getElementById("cfSuccessBody").textContent = body || "Done.";
+    m.show();
+  }
+
   // Set Date Raised today
   var input = document.querySelector('input[name="dateRaised"]');
   if (input) {
@@ -152,45 +186,78 @@ document.addEventListener("DOMContentLoaded", async function () {
   }
 
   // SAVE buttons -> save/patch draft (status: pending)
-  document.querySelectorAll(".btn.btn-save").forEach(btn => {
-    btn.addEventListener("click", async (e) => {
+  // SAVE (draft): confirm, save, then success modal
+  document.querySelectorAll(".btn.btn-save").forEach(function (btn) {
+    btn.addEventListener("click", async function (e) {
       e.preventDefault();
-      await trySaveDraft(true);
+
+      var ok = await showConfirmModal(
+        "Save Draft?",
+        "Save your progress as a draft? You can continue later.",
+        "Save Draft"
+      );
+      if (!ok) return;
+
+      var prevHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+
+      try {
+        await trySaveDraft(false);
+        var ncrNo = document.querySelector("[name='ncrNo']")?.value || "Draft";
+        showSuccessModal("Draft Saved", `💾 Your draft (${ncrNo}) has been saved.`);
+      } catch (err) {
+        console.error(err);
+        showSuccessModal("Save Failed", "❌ Could not save draft: " + (err?.message || err));
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = prevHtml;
+      }
     });
   });
 
-  // SUBMIT (final) -> sets status to "open" and updates existing draft if present
-  document.getElementById("submitNcr").addEventListener("click", async (e) => {
+
+  document.getElementById("submitNcr").addEventListener("click", async function (e) {
     e.preventDefault();
 
-    var supplierSelect = document.getElementById("supplier");
-    var supplierName = supplierSelect?.value === "add_new"
-      ? document.getElementById("newSupplierName")?.value?.trim()
-      : supplierSelect?.value?.trim();
+    var ok = await showConfirmModal(
+      "Create NCR?",
+      "Please confirm you want to create this NCR. You can still edit it later.",
+      "Create"
+    );
+    if (!ok) return;
 
-    var formVals = {
-      ncrNo: document.querySelector("[name='ncrNo']")?.value?.trim(),
-      productNo: document.querySelector("[name='productNo']")?.value?.trim(),
-      soNo: document.querySelector("[name='soNo']")?.value?.trim(),
-      dateRaised: document.querySelector("[name='dateRaised']")?.value?.trim(),
-      dateClosed: (() => {
-        var v = document.querySelector("[name='dateClosed']")?.value?.trim();
-        return v && v !== "N/A" ? v : null;
-      })(),
-      wip: document.querySelector("input[name='wip']:checked")?.value === "Yes",
-      defectDesc: document.querySelector("[name='defectDesc']")?.value?.trim(),
-      isNC: document.querySelector("input[name='isNC']:checked")?.value === "Yes",
-      qtySupplied: Number(document.querySelector("[name='qtySupplied']")?.value ?? 0),
-      qtyDefective: Number(document.querySelector("[name='qtyDefective']")?.value ?? 0),
-      repName: document.querySelector("[name='repName']")?.value?.trim(),
-      status: "open"
-    };
+    var submitBtn = document.getElementById("submitNcr");
+    var prevHtml = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
 
     try {
-      // supplier required on submit
-      var supplierId = await window.NCR.api.getOrCreateSupplierId(supplierName);
+      var supplierSelect = document.getElementById("supplier");
+      var supplierName = supplierSelect?.value === "add_new"
+        ? document.getElementById("newSupplierName")?.value?.trim()
+        : supplierSelect?.value?.trim();
 
-      const payload = {
+      var formVals = {
+        ncrNo: document.querySelector("[name='ncrNo']")?.value?.trim(),
+        productNo: document.querySelector("[name='productNo']")?.value?.trim(),
+        soNo: document.querySelector("[name='soNo']")?.value?.trim(),
+        dateRaised: document.querySelector("[name='dateRaised']")?.value?.trim(),
+        dateClosed: (function () {
+          var v = document.querySelector("[name='dateClosed']")?.value?.trim();
+          return v && v !== "N/A" ? v : null;
+        })(),
+        wip: document.querySelector("input[name='wip']:checked")?.value === "Yes",
+        defectDesc: document.querySelector("[name='defectDesc']")?.value?.trim(),
+        isNC: document.querySelector("input[name='isNC']:checked")?.value === "Yes",
+        qtySupplied: Number(document.querySelector("[name='qtySupplied']")?.value ?? 0),
+        qtyDefective: Number(document.querySelector("[name='qtyDefective']")?.value ?? 0),
+        repName: document.querySelector("[name='repName']")?.value?.trim(),
+        status: "open"
+      };
+
+      var supplierId = await window.NCR.api.getOrCreateSupplierId(supplierName);
+      var payload = {
         ncr_no: formVals.ncrNo,
         supplier_id: supplierId,
         product_no: formVals.productNo,
@@ -206,37 +273,40 @@ document.addEventListener("DOMContentLoaded", async function () {
         status: "open"
       };
 
-      let saved;
+      var saved;
       if (window.NCR.state.ncrId) {
         saved = await window.NCR.api.updateNcr(window.NCR.state.ncrId, payload);
       } else {
         saved = await window.NCR.api.insertNcr(payload);
       }
 
-      alert(`✅ NCR saved successfully! #${saved.ncr_no}`);
+      showSuccessModal(
+        "NCR Created",
+        `✅ NCR #${saved.ncr_no} was created successfully.`
+      );
+
       window.NCR.utils.resetFormForNext();
       await window.NCR.utils.setNcrNoField();
       window.NCR.state.ncrId = null;
-      // window.location.href = "view-ncr.html"; // enable if you want to redirect after submit
+
     } catch (err) {
       console.error(err);
-      alert("❌ Failed to save NCR: " + err.message);
+      showSuccessModal("Save Failed", "❌ Failed to save NCR: " + (err?.message || err));
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = prevHtml;
     }
   });
 
-  // ----------------- helpers -----------------
 
-  // Select supplier by numeric ID; add an option if the ID isn't in the list
   async function selectSupplierById(id) {
     if (id == null) return;
     const select = document.getElementById("supplier");
     if (!select) return;
 
-    // try direct match first
     select.value = String(id);
     if (select.value === String(id)) return;
 
-    // Fetch supplier name and inject an option so the selection sticks
     try {
       const url = `${window.NCR.api.BASE_URL}/rest/v1/suppliers?select=id,name&id=eq.${encodeURIComponent(id)}&limit=1`;
       const res = await fetch(url, {
@@ -261,11 +331,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       select.value = String(sup.id);
     } catch (_) {
-      // silent
     }
   }
 
-  // Resolve a supplier id for drafts: existing id, chosen name, new name, or fallback placeholder
   async function ensureDraftSupplierId() {
     const DRAFT_SUPPLIER_NAME = "Unspecified (Draft)";
 
@@ -290,10 +358,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     return await window.NCR.api.getOrCreateSupplierId(DRAFT_SUPPLIER_NAME);
   }
 
-  // Save or update a draft with safe defaults
   async function trySaveDraft(showAlert) {
     try {
-      // 1) Ensure NCR No exists (fallback for NOT NULL/UNIQUE in some schemas)
       const ncrNoEl = document.querySelector("[name='ncrNo']");
       let ncrNo = ncrNoEl?.value?.trim();
       if (!ncrNo || ncrNo.length < 3) {
@@ -304,7 +370,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (ncrNoEl) ncrNoEl.value = ncrNo;
       }
 
-      // 2) Ensure date_raised exists (fallback to today)
       const dateEl = document.querySelector("[name='dateRaised']");
       let dateRaised = dateEl?.value?.trim();
       if (!dateRaised) {
@@ -316,10 +381,8 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (dateEl) dateEl.value = dateRaised;
       }
 
-      // 3) Ensure supplier_id
       const supplierId = await ensureDraftSupplierId();
 
-      // 4) Build payload (partial fields allowed)
       const payload = {
         ncr_no: ncrNo,
         supplier_id: supplierId,
@@ -336,7 +399,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         qty_supplied: (document.querySelector("[name='qtySupplied']")?.value ?? "") === "" ? null : Number(document.querySelector("[name='qtySupplied']")?.value),
         qty_defective: (document.querySelector("[name='qtyDefective']")?.value ?? "") === "" ? null : Number(document.querySelector("[name='qtyDefective']")?.value),
         rep_name: document.querySelector("[name='repName']")?.value?.trim() || null,
-        status: "pending" // your Draft
+        status: "pending"
       };
 
       let saved;
