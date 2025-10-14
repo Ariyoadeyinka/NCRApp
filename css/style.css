@@ -816,3 +816,20 @@ main {
 footer.app-footer {
     margin-top: auto;
 }
+input.form-control.disabled-form[readonly],
+input.form-control.disabled-form:disabled {
+    background-color: #e0e0e0 !important;
+    color: #333;
+    border: none;
+    opacity: 1 !important;
+}
+.create-new-ncr{
+    background-color:  #f8f9fa;
+    color: #173451;
+    border: 1.5px solid #173451;
+}
+
+.create-new-ncr:hover{
+    background-color: #173451;
+    color: white;
+}

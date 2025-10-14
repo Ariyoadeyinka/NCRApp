@@ -24,10 +24,11 @@
 
   async function fetchNCRs() {
     const params = [
-      "select=id,ncr_no,status,product_no,so_no,qty_defective,qty_supplied,rep_name,wip,date_raised,supplier_id,suppliers(name)",
+      "select=id,ncr_no,status,product_no,so_no,qty_defective,qty_supplied,rep_name,wip,date_raised,supplier_id,suppliers(name),current_stage,whose_turn_dept,next_up_dept",
       "order=id.desc",
       "limit=200"
     ].join("&");
+
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs?${params}`, {
       headers: {
@@ -56,50 +57,111 @@
     if (s === "closed") {
       return `<span class="badge rounded-pill bg-success bg-opacity-25 text-success fw-semibold me-2 px-3 py-1">CLOSED</span>`;
     }
-    if (s === "pending") {
-      return `<span class="badge rounded-pill bg-warning bg-opacity-25 text-dark fw-semibold me-2 px-3 py-1">PENDING</span>`;
+    if (s === "pending" || s === "draft") {
+      return `<span class="badge rounded-pill bg-warning bg-opacity-25 text-dark fw-semibold me-2 px-3 py-1">DRAFT</span>`;
     }
     return `<span class="badge-open text-dark me-2">OPEN</span>`;
   }
+  function stageLabel(s) {
+    const map = { quality: "Quality", engineering: "Engineering", operations: "Operations", closed: "Closed" };
+    return map[(s || "").toLowerCase()] || "";
+  }
 
-  function renderCard(n) {
-    const supplierName =
-      (n.suppliers && n.suppliers.name) ? n.suppliers.name : ""; // requires FK; otherwise blank
-    const qtyText = (n.qty_defective ?? "") && (n.qty_supplied ?? "")
-      ? `${n.qty_defective} / ${n.qty_supplied}` : "";
+function stageLabel(s) {
+  const map = { quality: "Quality", engineering: "Engineering", operations: "Operations", closed: "Closed" };
+  return map[(s || "").toLowerCase()] || "";
+}
 
-    const processText = n.wip ? "WIP" : "Supplier";
+function computeNextDept(n) {
+  // prefer DB-provided next_up_dept; otherwise compute from current_stage
+  const next = (n.next_up_dept || "").toLowerCase();
+  if (next) return next;
+  const cur = String(n.current_stage || "").toLowerCase();
+  if (cur === "quality") return "engineering";
+  if (cur === "engineering") return "operations";
+  if (cur === "operations") return "closed";
+  return "";
+}
 
-    return `
+function nextDeptBadge(n) {
+  const s = String(n.status || "").toLowerCase();
+  const isDraft = (s === "pending" || s === "draft");
+  const isClosed = (s === "closed");
+  if (isDraft || isClosed) return ""; // hide on drafts/closed
+
+  const dept = computeNextDept(n);
+  if (!dept || dept === "closed") return ""; // nothing after Operations
+
+  // Pick a Bootstrap look per department
+  const looks = {
+    quality:     "bg-info text-dark",
+    engineering: "bg-primary",
+    operations:  "bg-secondary"
+  };
+  const cls = looks[dept] || "bg-secondary";
+  const label = stageLabel(dept).toUpperCase();
+
+  return `<span class="badge rounded-pill ${cls} fw-semibold me-2 px-3 py-1">NEXT: ${label}</span>`;
+}
+
+
+
+function renderCard(n) {
+  const supplierName = (n.suppliers && n.suppliers.name) ? n.suppliers.name : "";
+  const qtyText = (n.qty_defective ?? "") && (n.qty_supplied ?? "")
+    ? `${n.qty_defective} / ${n.qty_supplied}` : "";
+
+  const processText = n.wip ? "WIP" : "Supplier";
+  const s = String(n.status || "").toLowerCase();
+  const isDraft  = (s === "pending" || s === "draft");
+  const isClosed = (s === "closed");
+
+  // Build the 'Next Dept' badge
+  const nextBadge = nextDeptBadge(n);
+
+  return `
 <div class="card p-4 mb-4 shadow-sm border rounded-3" style="border-radius: 12px;" data-id="${n.id}">
-  <div class="d-flex justify-content-between align-items-start">
-    <div>
-      <h5 class="fw-semibold text-dark mb-1">${n.ncr_no || ""}</h5>
-      <p class="text-muted mb-4">${n.product_no ? ` (Product: ${n.product_no})` : ""}${n.so_no ? ` (SO: ${n.so_no})` : ""}</p>
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div class="min-w-0">
+      <h5 class="fw-semibold text-dark mb-1 text-truncate">${n.ncr_no || ""}</h5>
+      <div class="text-muted small">
+        ${n.product_no ? `<span>Product-No: <span class="text-dark">${n.product_no}</span></span>` : ""}
+        ${n.so_no ? `<span class="ms-2">Sales-Order No: <span class="text-dark">${n.so_no}</span></span>` : ""}
+      </div>
     </div>
-    <div>${statusBadge(n.status)}</div>
-  </div>
-
-  <div class="row mb-4">
-    <div class="col-md-6">
-      <p class="mb-2"><strong class="text-muted">Quality Rep:</strong> <span class="text-dark">${n.rep_name || ""}</span></p>
-      <p class="mb-2"><strong class="text-muted">Process:</strong> <span class="text-dark">${processText}</span></p>
-      ${supplierName ? `<p class="mb-2"><strong class="text-muted">Supplier:</strong> <span class="text-dark">${supplierName}</span></p>` : ""}
-      ${qtyText ? `<p class="mb-0"><strong class="text-muted">Qty Defective:</strong> <span class="text-dark">${qtyText}</span></p>` : ""}
-    </div>
-    <div class="col-md-6">
-      <p class="mb-2"><strong class="text-muted">Date Created:</strong> <span class="text-dark">${fmtDate(n.date_raised)}</span></p>
-      ${n.product_no ? `<p class="mb-0"><strong class="text-muted">Product No:</strong> <span class="text-dark">${n.product_no}</span></p>` : ""}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      ${nextBadge}
+      ${statusBadge(n.status)}
     </div>
   </div>
 
-  <div class="d-flex justify-content-end gap-2">
-    <button class="btn btn-outline-primary" data-action="view"><i class="fa fa-eye me-1"></i> View</button>
-    <button class="btn btn-outline-dark" data-action="edit"><i class="fa fa-pen me-1"></i> Edit</button>
+  <div class="row mt-3 g-3">
+    <div class="col-md-6">
+      <p class="mb-1"><span class="text-muted">Quality Rep:</span> <span class="text-dark">${n.rep_name || "—"}</span></p>
+      <p class="mb-1"><span class="text-muted">Process:</span> <span class="text-dark">${processText}</span></p>
+      ${supplierName ? `<p class="mb-1"><span class="text-muted">Supplier:</span> <span class="text-dark">${supplierName}</span></p>` : ""}
+    </div>
+    <div class="col-md-6">
+      ${qtyText ? `<p class="mb-1"><span class="text-muted">Qty Defective:</span> <span class="text-dark">${qtyText}</span></p>` : ""}
+      <p class="mb-1"><span class="text-muted">Date Created:</span> <span class="text-dark">${fmtDate(n.date_raised)}</span></p>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mt-3">
+    ${isDraft
+      ? `<a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
+           <i class="fa fa-play me-1"></i> Continue
+         </a>`
+      : `
+         <button class="btn btn-outline-primary" data-action="view"><i class="fa fa-eye me-1"></i> View</button>
+         <button class="btn btn-outline-dark" data-action="edit"><i class="fa fa-pen me-1"></i> Edit</button>
+        `}
     <button class="btn btn-outline-danger btn-sm" data-action="delete"><i class="bi bi-trash"></i> Delete</button>
   </div>
 </div>`;
-  }
+}
+
+
 
   function applyFilters(rows, searchTerm, status) {
     let out = rows;
@@ -180,6 +242,7 @@
       } else if (action === "edit") {
         alert("Edit action clicked (implement navigation).");
       }
+      // no handler needed for "continue" since it's an <a> link
     });
   });
 })();
