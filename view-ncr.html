@@ -24,7 +24,7 @@
         <a class="navbar-brand d-flex align-items-center gap-2" href="/" aria-label="Return to dashboard">
           <img src="images/logo.png" alt="Crossfire Logo" style="height: 50px; width: auto;">
           <span class="brand-divider">|</span>
-          <span class="text-body-secondary small" id="pageTitle">Dashboard</span>
+          <span class="text-body-secondary small" id="pageTitle">Viewing NCR</span>
         </a>
 
 
@@ -106,11 +106,13 @@
           </div>
         </div>
         <div class="col-md-3">
-          <select class="form-select">
-            <option selected>All Status</option>
-            <option>Open</option>
-            <option>Closed</option>
+          <select class="form-select" id="statusFilter">
+            <option value="">All Status</option>
+            <option value="open">Open</option>
+            <option value="pending">Draft</option>
+            <option value="closed">Closed</option>
           </select>
+
         </div>
       </div>
 

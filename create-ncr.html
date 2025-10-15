@@ -18,7 +18,7 @@
                 <a class="navbar-brand d-flex align-items-center gap-2" href="/">
                     <img src="images/logo.png" alt="Crossfire Logo" style="height:50px">
                     <span class="brand-divider">|</span>
-                    <span class="text-body-secondary small" id="pageTitle">Dashboard</span>
+                    <span class="text-body-secondary small" id="pageTitle">Creating NCR</span>
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
                     <span class="navbar-toggler-icon"></span>
@@ -69,23 +69,6 @@
             <a href="index.html" class="text-muted text-decoration-none">Dashboard</a>
             <span class="mx-2">›</span><a href="view-ncr.html" class="text-muted text-decoration-none">NCR List</a>
             <span class="mx-2">›</span><strong class="text-dark">Create New NCR</strong>
-        </div>
-
-        <div class="cf-stepper container-xxl my-2">
-            <div class="cf-stepper-item">
-                <span class="cf-step-icon"><i class="fa-regular fa-file-lines"></i></span>
-                <span class="cf-stepper-label">NCR Details</span>
-            </div>
-            <div class="cf-stepper-line"></div>
-            <div class="cf-stepper-item">
-                <span class="cf-step-icon"><i class="fa-regular fa-clipboard"></i></span>
-                <span class="cf-stepper-label">Quality Details</span>
-            </div>
-            <div class="cf-stepper-line"></div>
-            <div class="cf-stepper-item">
-                <span class="cf-step-icon"><i class="fa-regular fa-eye"></i></span>
-                <span class="cf-stepper-label">Review &amp; Submit</span>
-            </div>
         </div>
 
         <section id="step1" class="container-xxl cf-view">
@@ -262,103 +245,121 @@
             </div>
         </section>
 
-        <section id="step3" class="container-xxl cf-view">
-            <div class="card border-0 shadow-sm cf-card">
-                <div class="card-body">
-                    <div class="cf-head cf-head-review">
-                        <h6 class="fw-semibold mb-1"><i class="fa-regular fa-eye me-2"></i>Review &amp; Confirm</h6>
-                        <p class="text-muted small mb-4">Please review all information before submitting</p>
-                    </div>
-                    <form class="cf-form">
-                        <fieldset class="cf-block cf-block-ncr">
-                            <legend class="cf-legend"><i class="fa-regular fa-file-lines"></i> NCR Details</legend>
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="form-label">NCR No</label>
-                                    <input class="form-control form-control-lg bg-body-tertiary" id="reviewNcrNo"
-                                        readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Supplier Name</label>
-                                    <input class="form-control form-control-lg bg-body-tertiary" id="reviewSupplier"
-                                        readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Product No</label>
-                                    <input class="form-control form-control-lg bg-body-tertiary" id="reviewProductNo"
-                                        readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Sales Order No</label>
-                                    <input class="form-control form-control-lg bg-body-tertiary" id="reviewSoNo"
-                                        readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Date Raised</label>
-                                    <input class="form-control form-control-lg bg-body-tertiary" id="reviewDateRaised"
-                                        readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Closed Date</label>
-                                    <input class="form-control form-control-lg bg-body-tertiary" id="reviewDateClosed"
-                                        readonly>
-                                </div>
-                            </div>
-                        </fieldset>
-                        <fieldset class="cf-block cf-block-quality">
-                            <legend class="cf-legend"><i class="fa-regular fa-clipboard"></i> Quality Details</legend>
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="form-label">WIP PRO</label>
-                                    <input class="form-control bg-body-tertiary" id="reviewWip" readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Item Marked as Non-Conforming</label>
-                                    <input class="form-control bg-body-tertiary" id="reviewIsNc" readonly>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Quantity Supplied</label>
-                                    <input type="number" min="0" class="form-control bg-body-tertiary"
-                                        id="reviewQtySupplied" readonly>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Quantity Defective</label>
-                                    <input type="number" min="0" class="form-control bg-body-tertiary"
-                                        id="reviewQtyDefective" readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Defect Description</label>
-                                    <input class="form-control bg-body-tertiary" id="reviewDefectDesc" readonly>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Quality Rep Name</label>
-                                    <input class="form-control bg-body-tertiary" id="reviewRepName" readonly>
-                                </div>
-                            </div>
-                        </fieldset>
+<section id="step3" class="container-xxl cf-view">
+  <div class="card border-0 shadow-sm cf-card">
+    <div class="card-body">
+      <div class="cf-head cf-head-review d-flex flex-column flex-lg-row align-items-lg-center justify-content-lg-between">
+        <div>
+          <h6 class="fw-semibold mb-1"><i class="fa-regular fa-eye me-2"></i>Review &amp; Confirm</h6>
+          <p class="text-muted small mb-0">Please review all information before submitting</p>
+        </div>
+      </div>
 
-                        <div
-                            class="cf-actions cf-actions-quality d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mt-4">
-                            <div class="d-flex gap-2 flex-wrap order-1">
-                                <a href="#step2" class="btn btn-outline-secondary" id="backToStep1">
-                                    <i class="fa-solid fa-arrow-left-long me-1"></i> Back
-                                </a>
-                                <button type="button" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i>
-                                    Save</button>
-                                <a href="index.html" class="btn btn-light">Cancel</a>
-                            </div>
-                            <div class="d-flex order-2 ms-md-auto">
-                                <a href="#" class="btn btn-primary cf-wide w-100 w-md-auto" id="submitNcr">
-                                    <i class="fa-regular fa-paper-plane me-1"></i> Complete NCR
-                                </a>
-                            </div>
-                        </div>
+      <form class="cf-form">
+        <!-- Two-column layout -->
+        <div class="row g-4">
+          <!-- Left: NCR Details -->
+          <div class="col-12 col-lg-6">
+            <fieldset class="cf-block cf-block-ncr h-100">
+              <legend class="cf-legend mb-3">
+                <i class="fa-regular fa-file-lines"></i> NCR Details
+              </legend>
 
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">NCR No</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewNcrNo" readonly>
                 </div>
-                </form>
-            </div>
-            </div>
-        </section>
+
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">Supplier Name</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewSupplier" readonly>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">Product No</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewProductNo" readonly>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">Sales Order No</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewSoNo" readonly>
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Date Raised</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewDateRaised" readonly>
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Closed Date</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewDateClosed" readonly>
+                </div>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="col-12 col-lg-6">
+            <fieldset class="cf-block cf-block-quality h-100">
+              <legend class="cf-legend mb-3">
+                <i class="fa-regular fa-clipboard"></i> Quality Details
+              </legend>
+
+              <div class="row g-3">
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">WIP PRO</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewWip" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Item Marked as Non-Conforming</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewIsNc" readonly>
+                </div>
+
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Quantity Supplied</label>
+                  <input type="number" min="0" class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewQtySupplied" readonly>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small text-muted mb-1">Quantity Defective</label>
+                  <input type="number" min="0" class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewQtyDefective" readonly>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">Defect Description</label>
+                  <textarea class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewDefectDesc" readonly> </textarea>
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small text-muted mb-1">Quality Rep Name</label>
+                  <input class="form-control form-control-sm bg-body-tertiary disabled-form" id="reviewRepName" readonly>
+                </div>
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        <!-- Actions: always visible without much scroll -->
+        <div class="d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 mt-4">
+          <div class="d-flex gap-2 flex-wrap order-1">
+            <a href="#step2" class="btn btn-outline-secondary" id="backToStep2">
+              <i class="fa-solid fa-arrow-left-long me-1"></i> Back
+            </a>
+            <button type="button" class="btn btn-save">
+              <i class="fa-solid fa-floppy-disk"></i> Save
+            </button>
+            <a href="index.html" class="btn btn-light">Cancel</a>
+          </div>
+          <div class="d-flex order-2 ms-md-auto">
+            <a href="#" class="btn btn-primary cf-wide w-100 w-md-auto" id="submitNcr">
+              <i class="fa-regular fa-paper-plane me-1"></i> Complete NCR
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
     </main>
     <div class="modal fade" id="cfConfirmModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">

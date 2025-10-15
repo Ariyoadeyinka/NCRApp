@@ -66,56 +66,63 @@
     return map[(s || "").toLowerCase()] || "";
   }
 
-function stageLabel(s) {
-  const map = { quality: "Quality", engineering: "Engineering", operations: "Operations", closed: "Closed" };
-  return map[(s || "").toLowerCase()] || "";
-}
+  function stageLabel(s) {
+    const map = { quality: "Quality", engineering: "Engineering", operations: "Operations", closed: "Closed" };
+    return map[(s || "").toLowerCase()] || "";
+  }
 
-function computeNextDept(n) {
-  const next = (n.next_up_dept || "").toLowerCase();
-  if (next) return next;
-  const cur = String(n.current_stage || "").toLowerCase();
-  if (cur === "quality") return "engineering";
-  if (cur === "engineering") return "operations";
-  if (cur === "operations") return "closed";
-  return "";
-}
+  function computeNextDept(n) {
+    const next = (n.next_up_dept || "").toLowerCase();
+    if (next) return next;
+    const cur = String(n.current_stage || "").toLowerCase();
+    if (cur === "quality") return "engineering";
+    if (cur === "engineering") return "operations";
+    if (cur === "operations") return "closed";
+    return "";
+  }
 
-function nextDeptBadge(n) {
-  const s = String(n.status || "").toLowerCase();
-  const isDraft = (s === "pending" || s === "draft");
-  const isClosed = (s === "closed");
-  if (isDraft || isClosed) return ""; 
+  function nextDeptBadge(n) {
+    const s = String(n.status || "").toLowerCase();
+    const isDraft = (s === "pending" || s === "draft");
+    const isClosed = (s === "closed");
+    if (isDraft || isClosed) return "";
 
-  const dept = computeNextDept(n);
-  if (!dept || dept === "closed") return ""; 
+    const dept = computeNextDept(n);
+    if (!dept || dept === "closed") return "";
 
-  const looks = {
-    quality:     "bg-info text-dark",
-    engineering: "bg-primary",
-    operations:  "bg-secondary"
-  };
-  const cls = looks[dept] || "bg-secondary";
-  const label = stageLabel(dept).toUpperCase();
+    const COLORS = {
+      quality: { bg: "#E6F4FF", text: "#173451" },
+      engineering: { bg: "#173451", text: "#FFFFFF" },
+      operations: { bg: "#EFEAFE", text: "#3B2F5C" }
+    };
 
-  return `<span class="badge rounded-pill ${cls} fw-semibold me-2 px-3 py-1">NEXT: ${label}</span>`;
-}
+    const { bg, text } = COLORS[dept] || { bg: "#EEE", text: "#222" };
+    const label = stageLabel(dept).toUpperCase();
+
+    return `
+    <span class="badge rounded-pill fw-semibold me-2 px-3 py-1"
+          style="background:${bg};color:${text};">
+      NEXT: ${label}
+    </span>
+  `;
+  }
 
 
 
-function renderCard(n) {
-  const supplierName = (n.suppliers && n.suppliers.name) ? n.suppliers.name : "";
-  const qtyText = (n.qty_defective ?? "") && (n.qty_supplied ?? "")
-    ? `${n.qty_defective} / ${n.qty_supplied}` : "";
 
-  const processText = n.wip ? "WIP" : "Supplier";
-  const s = String(n.status || "").toLowerCase();
-  const isDraft  = (s === "pending" || s === "draft");
-  const isClosed = (s === "closed");
+  function renderCard(n) {
+    const supplierName = (n.suppliers && n.suppliers.name) ? n.suppliers.name : "";
+    const qtyText = (n.qty_defective ?? "") && (n.qty_supplied ?? "")
+      ? `${n.qty_defective} / ${n.qty_supplied}` : "";
 
-  const nextBadge = nextDeptBadge(n);
+    const processText = n.wip ? "WIP" : "Supplier";
+    const s = String(n.status || "").toLowerCase();
+    const isDraft = (s === "pending" || s === "draft");
+    const isClosed = (s === "closed");
 
-  return `
+    const nextBadge = nextDeptBadge(n);
+
+    return `
 <div class="card p-4 mb-4 shadow-sm border rounded-3" style="border-radius: 12px;" data-id="${n.id}">
   <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
     <div class="min-w-0">
@@ -145,17 +152,17 @@ function renderCard(n) {
 
   <div class="d-flex justify-content-end gap-2 mt-3">
     ${isDraft
-      ? `<a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
+        ? `<a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
            <i class="fa fa-play me-1"></i> Continue
          </a>`
-      : `
-         <button class="btn btn-outline-primary" data-action="view"><i class="fa fa-eye me-1"></i> View</button>
+        : `
+         <button class="btn btn-outline-primary" data-action="view"   style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;"><i class="fa fa-eye me-1"></i> View</button>
          <button class="btn btn-outline-dark" data-action="edit"><i class="fa fa-pen me-1"></i> Edit</button>
         `}
     <button class="btn btn-outline-danger btn-sm" data-action="delete"><i class="bi bi-trash"></i> Delete</button>
   </div>
 </div>`;
-}
+  }
 
 
 
@@ -236,7 +243,8 @@ function renderCard(n) {
       } else if (action === "view") {
         window.location.href = `/ncr-detail.html?id=${id}`;
       } else if (action === "edit") {
-        alert("Edit action clicked (implement navigation).");
+        const params = new URLSearchParams({ ncrId: String(id), mode: "edit", returnTo: "view-ncr.html" });
+        window.location.href = `create-ncr.html?${params.toString()}`;
       }
     });
   });

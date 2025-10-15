@@ -25,12 +25,45 @@ document.addEventListener("DOMContentLoaded", async function () {
       });
       el.addEventListener("hidden.bs.modal", function onHide() {
         el.removeEventListener("hidden.bs.modal", onHide);
-        resolve(false); // if closed without clicking Yes
+        resolve(false);
       }, { once: true });
 
       m.show();
     });
   }
+
+
+
+  const mode = new URL(location.href).searchParams.get("mode");
+  const returnTo = new URL(location.href).searchParams.get("returnTo");
+
+
+  if (mode === "edit") {
+    const titleEl = document.getElementById("pageTitle");
+    if (titleEl) titleEl.textContent = "Editing NCR";
+  }
+  function showStepById(id) {
+    ["step1", "step2", "step3"].forEach(s => {
+      const el = document.getElementById(s);
+      if (el) el.style.display = (s === id ? "block" : "none");
+    });
+  }
+
+  const urlStart = new URL(location.href).searchParams.get("startStep");
+  const hashStart = (location.hash || "").replace("#", "");
+  if (urlStart === "2" || urlStart === "step2" || hashStart === "step2") {
+    showStepById("step2");
+  } else if (urlStart === "3" || urlStart === "step3" || hashStart === "step3") {
+    showStepById("step3");
+  } else {
+    showStepById("step1");
+  }
+
+  if (returnTo) {
+    document.querySelector('#cfSuccessModal .btn.btn-primary')
+      ?.addEventListener('click', () => { window.location.href = returnTo; }, { once: true });
+  }
+
 
   function showSuccessModal(title, body) {
     var el = document.getElementById("cfSuccessModal");
@@ -40,7 +73,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     m.show();
   }
 
-  // Set Date Raised today
   var input = document.querySelector('input[name="dateRaised"]');
   if (input) {
     var now = new Date();
@@ -52,23 +84,19 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (review) review.value = input.value;
   }
 
-  // Initialize supplier dropdown and NCR number
   await window.NCR.suppliers.initSuppliers();
   await window.NCR.utils.setNcrNoField();
 
-  // --- Persist supplier instantly when changed (keeps it sticky next time) ---
   const supplierSelectEl = document.getElementById("supplier");
   supplierSelectEl?.addEventListener("change", async () => {
     const val = supplierSelectEl.value;
 
-    // If user picked an existing numeric id, just save
     const parsed = Number(val);
     if (val && val !== "add_new" && Number.isFinite(parsed)) {
-      await trySaveDraft(false); // silent
+      await trySaveDraft(false);
       return;
     }
 
-    // If options store names, resolve to id and rewrite the selected option to that id
     if (val && val !== "add_new") {
       const id = await window.NCR.api.getOrCreateSupplierId(val.trim());
       supplierSelectEl.options[supplierSelectEl.selectedIndex].value = String(id);
@@ -76,10 +104,8 @@ document.addEventListener("DOMContentLoaded", async function () {
       return;
     }
 
-    // If "+ Add New Supplier", wait for Add button handler
   });
 
-  // If you show an "Add New Supplier" UI, select new supplier immediately and save
   document.getElementById("addSupplierBtn")?.addEventListener("click", async () => {
     const input = document.getElementById("newSupplierName");
     const name = input?.value?.trim();
@@ -88,7 +114,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     const id = await window.NCR.api.getOrCreateSupplierId(name);
 
     const select = document.getElementById("supplier");
-    // add option if missing, then select it
     let opt = Array.from(select.options).find(o => o.value === String(id));
     if (!opt) {
       opt = document.createElement("option");
@@ -100,10 +125,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
     select.value = String(id);
 
-    await trySaveDraft(false); // persist immediately
+    await trySaveDraft(false);
   });
 
-  // Live validation UI reset on input
   document.querySelectorAll("input, select, textarea").forEach(el => {
     el.addEventListener("input", () => {
       if (el.value.trim() || el.type === "number") {
@@ -116,27 +140,38 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   });
 
-  // Step navigation validation
   var toStep2 = document.getElementById("toStep2");
   var toStep3 = document.getElementById("toStep3");
   toStep2.addEventListener("click", (e) => {
-    var ok = window.NCR.utils.validateStep(document.getElementById("step1"));
-    if (!ok) e.preventDefault();
-  });
-  toStep3.addEventListener("click", async (e) => {
-    var ok = window.NCR.utils.validateStep(document.getElementById("step2"));
+    const ok = window.NCR.utils.validateStep(document.getElementById("step1"));
     if (!ok) { e.preventDefault(); return; }
-    // Save progress before review (optional but helpful)
-    await trySaveDraft();
-    window.NCR.utils.fillReview();
+    e.preventDefault();
+    showStepById("step2");
   });
 
-  // Non-Conforming radio text sync (if used)
+  toStep3.addEventListener("click", async (e) => {
+    const ok = window.NCR.utils.validateStep(document.getElementById("step2"));
+    if (!ok) { e.preventDefault(); return; }
+    e.preventDefault();
+    await trySaveDraft();
+    window.NCR.utils.fillReview();
+    showStepById("step3");
+  });
+
+  document.getElementById("backToStep1")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    showStepById("step1");
+  });
+
+document.getElementById("backToStep2")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  showStepById("step2");
+});
+ 
   var nc = document.getElementById("nonConforming");
   var ncLbl = document.getElementById("nonConformingLabel");
   if (nc && ncLbl) nc.addEventListener("change", () => ncLbl.textContent = nc.checked ? "Yes" : "No");
 
-  // LOAD DRAFT if returning via ?ncrId=...
   const draftId = getQuery("ncrId") || getQuery("id");
   if (draftId) {
     try {
@@ -144,10 +179,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       if (n) {
         window.NCR.state.ncrId = n.id;
 
-        // Step 1
         document.querySelector("[name='ncrNo']").value = n.ncr_no || "";
         if (n.supplier_id != null) {
-          await selectSupplierById(n.supplier_id); // robust select by ID
+          await selectSupplierById(n.supplier_id);
         }
         document.querySelector("[name='productNo']").value = n.product_no || "";
         document.querySelector("[name='soNo']").value = n.so_no || "";
@@ -173,20 +207,17 @@ document.addEventListener("DOMContentLoaded", async function () {
         var reviewDate = document.getElementById('reviewDateRaised');
         if (reviewDate) reviewDate.value = (n.date_raised || "").slice(0, 10) || "";
 
-        // Show step 2 if it looks populated
-        const hasQuality = !!(n.defect_desc || n.rep_name || n.qty_defective || n.qty_supplied);
-        if (hasQuality) {
-          document.getElementById("step1").style.display = "none";
-          document.getElementById("step2").style.display = "block";
-        }
+        const startStep = new URL(location.href).searchParams.get("startStep") || (location.hash || "").replace("#", "");
+        if (startStep === "2" || startStep === "step2") showStepById("step2");
+        else if (startStep === "3" || startStep === "step3") showStepById("step3");
+        else showStepById("step1");
+
       }
     } catch (e) {
       console.warn("Failed to load draft:", e);
     }
   }
 
-  // SAVE buttons -> save/patch draft (status: pending)
-  // SAVE (draft): confirm, save, then success modal
   document.querySelectorAll(".btn.btn-save").forEach(function (btn) {
     btn.addEventListener("click", async function (e) {
       e.preventDefault();
@@ -205,10 +236,10 @@ document.addEventListener("DOMContentLoaded", async function () {
       try {
         await trySaveDraft(false);
         var ncrNo = document.querySelector("[name='ncrNo']")?.value || "Draft";
-        showSuccessModal("Draft Saved", `💾 Your draft (${ncrNo}) has been saved.`);
+        showSuccessModal("Draft Saved", `Your draft (${ncrNo}) has been saved.`);
       } catch (err) {
         console.error(err);
-        showSuccessModal("Save Failed", "❌ Could not save draft: " + (err?.message || err));
+        showSuccessModal("Save Failed", "Could not save draft: " + (err?.message || err));
       } finally {
         btn.disabled = false;
         btn.innerHTML = prevHtml;
@@ -282,7 +313,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       showSuccessModal(
         "NCR Created",
-        `✅ NCR #${saved.ncr_no} was created successfully.`
+        `NCR #${saved.ncr_no} was created successfully.`
       );
 
       window.NCR.utils.resetFormForNext();
@@ -291,7 +322,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     } catch (err) {
       console.error(err);
-      showSuccessModal("Save Failed", "❌ Failed to save NCR: " + (err?.message || err));
+      showSuccessModal("Save Failed", "Failed to save NCR: " + (err?.message || err));
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML = prevHtml;
@@ -412,10 +443,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (saved?.ncr_no && ncrNoEl) ncrNoEl.value = saved.ncr_no;
       }
 
-      if (showAlert) alert(`💾 Draft saved${saved?.ncr_no ? ` (#${saved.ncr_no})` : ""}.`);
+      if (showAlert) alert(`Draft saved${saved?.ncr_no ? ` (#${saved.ncr_no})` : ""}.`);
     } catch (err) {
       console.error(err);
-      if (showAlert) alert("❌ Could not save draft: " + (err?.message || err));
+      if (showAlert) alert("Could not save draft: " + (err?.message || err));
     }
   }
 });
