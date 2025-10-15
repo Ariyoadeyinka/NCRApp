@@ -39,44 +39,44 @@
     return data[0];
   }
 
-async function saveDraft(partial) {
-  const payload = { ...partial };
-  if (!payload.status) payload.status = "pending";
+  async function saveDraft(partial) {
+    const payload = { ...partial };
+    if (!payload.status) payload.status = "pending";
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_ANON,
-      Authorization: `Bearer ${SUPABASE_ANON}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(payload)
-  });
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON,
+        Authorization: `Bearer ${SUPABASE_ANON}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify(payload)
+    });
 
-  const raw = await res.text();
-  let data; try { data = JSON.parse(raw); } catch {}
-  if (!res.ok) throw new Error(data?.message || raw || "Draft save failed");
-  return (data && data[0]) || null;
-}
+    const raw = await res.text();
+    let data; try { data = JSON.parse(raw); } catch { }
+    if (!res.ok) throw new Error(data?.message || raw || "Draft save failed");
+    return (data && data[0]) || null;
+  }
 
-async function updateNcr(id, patch) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: {
-      apikey: SUPABASE_ANON,
-      Authorization: `Bearer ${SUPABASE_ANON}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation"
-    },
-    body: JSON.stringify(patch)
-  });
+  async function updateNcr(id, patch) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        apikey: SUPABASE_ANON,
+        Authorization: `Bearer ${SUPABASE_ANON}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify(patch)
+    });
 
-  const raw = await res.text();
-  let data; try { data = JSON.parse(raw); } catch {}
-  if (!res.ok) throw new Error(data?.message || raw || "Update failed");
-  return (data && data[0]) || null;
-}
+    const raw = await res.text();
+    let data; try { data = JSON.parse(raw); } catch { }
+    if (!res.ok) throw new Error(data?.message || raw || "Update failed");
+    return (data && data[0]) || null;
+  }
 
   async function updateNcr(id, patch) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`, {
@@ -130,4 +130,20 @@ async function updateNcr(id, patch) {
     getNcrById,
     closeNcr
   };
+
+  const go = (url) => { window.location.href = url; };
+
+  document.addEventListener('keydown', (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+
+    const t = e.target;
+    const typing = t && (t.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/i.test(t.tagName));
+    if (typing) return;
+
+    const key = (e.key || '').toLowerCase();
+    if (key === 'h') { e.preventDefault(); go('index.html'); }
+    else if (key === 'l') { e.preventDefault(); go('view-ncr.html'); }
+    else if (key === 'n') { e.preventDefault(); go('create-ncr.html'); }
+  }, { passive: true });
 })();

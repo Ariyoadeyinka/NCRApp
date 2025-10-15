@@ -41,12 +41,159 @@ document.addEventListener("DOMContentLoaded", async function () {
   if (mode === "edit") {
     const titleEl = document.getElementById("pageTitle");
     if (titleEl) titleEl.textContent = "Editing NCR";
+    const submitBtn = document.getElementById("submitNcr");
+    if (submitBtn) {
+      submitBtn.innerHTML = `<i class="fa-regular fa-paper-plane me-1"></i> Update`;
+      submitBtn.setAttribute("aria-label", "Update NCR");
+    }
   }
   function showStepById(id) {
     ["step1", "step2", "step3"].forEach(s => {
       const el = document.getElementById(s);
       if (el) el.style.display = (s === id ? "block" : "none");
     });
+  }
+  function $(sel) { return document.querySelector(sel); }
+  function byName(n) { return document.querySelector(`[name="${n}"]`); }
+
+  function showFieldError(el, msg) {
+    if (!el) return false;
+    el.classList.add("is-invalid");
+    el.style.borderColor = "#dc3545";
+    const holder = el.closest(".col-12, .col-md-6, .col") || el.parentElement;
+    if (holder && !holder.querySelector(".cf-error")) {
+      const small = document.createElement("div");
+      small.className = "cf-error small text-danger mt-1";
+      small.textContent = msg;
+      holder.appendChild(small);
+    }
+    return false;
+  }
+
+  function clearFieldError(el) {
+    if (!el) return;
+    el.classList.remove("is-invalid");
+    el.style.borderColor = "#17345120";
+    const holder = el.closest(".col-12, .col-md-6, .col") || el.parentElement;
+    const err = holder && holder.querySelector(".cf-error");
+    if (err) err.remove();
+  }
+
+  function parseIntOrNull(v) {
+    if (v === "" || v === null || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // Business rules:
+  // - qty_defective <= qty_supplied
+  // - numbers >= 0
+  // - defectDesc length >= 20 chars (when provided / required on step2 & submit)
+  // - productNo required (>0 length)
+  // - repName required (>=3 chars)
+  // - supplier required on submit (id or new name)
+  // - closed date (if present) >= date_raised
+  function validateBusinessRules(context /* 'step1' | 'step2' | 'submit' */) {
+    let ok = true;
+
+    // Step 1 checks
+    if (context === 'step1' || context === 'submit') {
+      const productNo = byName('productNo');
+      if (!productNo?.value?.trim()) {
+        ok = showFieldError(productNo, "Product number is required.") && ok;
+      } else {
+        clearFieldError(productNo);
+      }
+
+      const dateRaised = byName('dateRaised');
+      if (!dateRaised?.value?.trim()) {
+        ok = showFieldError(dateRaised, "Date raised is required.") && ok;
+      } else {
+        clearFieldError(dateRaised);
+      }
+
+      // closed date cannot be earlier than raised (if present and not 'N/A')
+      const dateClosed = byName('dateClosed');
+      const dr = dateRaised?.value ? new Date(dateRaised.value) : null;
+      const dcVal = dateClosed?.value?.trim();
+      if (dcVal && dcVal !== "N/A") {
+        const dc = new Date(dcVal);
+        if (dr && dc < dr) {
+          ok = showFieldError(dateClosed, "Closed date cannot be earlier than Date Raised.") && ok;
+        } else {
+          clearFieldError(dateClosed);
+        }
+      } else {
+        clearFieldError(dateClosed);
+      }
+    }
+
+    // Step 2 checks
+    if (context === 'step2' || context === 'submit') {
+      const qtySuppliedEl = byName('qtySupplied');
+      const qtyDefectiveEl = byName('qtyDefective');
+      const defectDescEl = byName('defectDesc');
+      const repNameEl = byName('repName');
+
+      const qs = parseIntOrNull(qtySuppliedEl?.value);
+      const qd = parseIntOrNull(qtyDefectiveEl?.value);
+
+      // numbers must be >= 0
+      if (qs === null || qs < 0) {
+        ok = showFieldError(qtySuppliedEl, "Quantity supplied must be 0 or greater.") && ok;
+      } else {
+        clearFieldError(qtySuppliedEl);
+      }
+      if (qd === null || qd < 0) {
+        ok = showFieldError(qtyDefectiveEl, "Quantity defective must be 0 or greater.") && ok;
+      } else {
+        clearFieldError(qtyDefectiveEl);
+      }
+
+      // qd <= qs
+      if (qs !== null && qd !== null && qd > qs) {
+        ok = showFieldError(qtyDefectiveEl, "Defective quantity cannot exceed supplied quantity.") && ok;
+      }
+
+      // description length >= 20
+      const desc = defectDescEl?.value?.trim() || "";
+      if (desc.length < 20) {
+        ok = showFieldError(defectDescEl, "Please provide at least 20 characters.") && ok;
+      } else {
+        clearFieldError(defectDescEl);
+      }
+
+      // rep required, min 3 chars
+      const rep = repNameEl?.value?.trim() || "";
+      if (rep.length < 3) {
+        ok = showFieldError(repNameEl, "Please enter the Quality Rep’s name (min 3 characters).") && ok;
+      } else {
+        clearFieldError(repNameEl);
+      }
+    }
+
+    // Submit-only checks
+    if (context === 'submit') {
+      // supplier must be resolvable
+      const supplierSelect = document.getElementById("supplier");
+      const newName = document.getElementById("newSupplierName")?.value?.trim();
+      const val = supplierSelect?.value;
+      const supplierInvalid =
+        !val || val === "" || (val === "add_new" && !newName);
+
+      if (supplierInvalid) {
+        ok = showFieldError(supplierSelect, "Please select a supplier or add a new one.") && ok;
+      } else {
+        clearFieldError(supplierSelect);
+      }
+    }
+
+    // focus first invalid field
+    if (!ok) {
+      const first = document.querySelector(".is-invalid");
+      first?.focus();
+    }
+    return !!ok;
   }
 
   const urlStart = new URL(location.href).searchParams.get("startStep");
@@ -140,34 +287,80 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   });
 
+  // Extra live checks for numeric & description fields
+  const qtySuppliedEl = byName('qtySupplied');
+  const qtyDefectiveEl = byName('qtyDefective');
+  const defectDescEl = byName('defectDesc');
+
+  qtySuppliedEl?.addEventListener('input', () => {
+    const qs = parseIntOrNull(qtySuppliedEl.value);
+    if (qs === null || qs < 0) {
+      showFieldError(qtySuppliedEl, "Quantity supplied must be 0 or greater.");
+    } else {
+      clearFieldError(qtySuppliedEl);
+      // also recheck the relation when supplied changes
+      const qd = parseIntOrNull(qtyDefectiveEl?.value);
+      if (qd !== null && qd > qs) {
+        showFieldError(qtyDefectiveEl, "Defective quantity cannot exceed supplied quantity.");
+      } else {
+        clearFieldError(qtyDefectiveEl);
+      }
+    }
+  });
+
+  qtyDefectiveEl?.addEventListener('input', () => {
+    const qs = parseIntOrNull(qtySuppliedEl?.value);
+    const qd = parseIntOrNull(qtyDefectiveEl.value);
+    if (qd === null || qd < 0) {
+      showFieldError(qtyDefectiveEl, "Quantity defective must be 0 or greater.");
+    } else if (qs !== null && qd > qs) {
+      showFieldError(qtyDefectiveEl, "Defective quantity cannot exceed supplied quantity.");
+    } else {
+      clearFieldError(qtyDefectiveEl);
+    }
+  });
+
+  defectDescEl?.addEventListener('input', () => {
+    const desc = defectDescEl.value.trim();
+    if (desc.length < 20) {
+      showFieldError(defectDescEl, `Please provide at least 20 characters (${20 - desc.length} more to go).`);
+    } else {
+      clearFieldError(defectDescEl);
+    }
+  });
+
   var toStep2 = document.getElementById("toStep2");
   var toStep3 = document.getElementById("toStep3");
   toStep2.addEventListener("click", (e) => {
-    const ok = window.NCR.utils.validateStep(document.getElementById("step1"));
-    if (!ok) { e.preventDefault(); return; }
+    const ok1 = window.NCR.utils.validateStep(document.getElementById("step1"));
+    const ok2 = validateBusinessRules('step1');
+    if (!ok1 || !ok2) { e.preventDefault(); return; }
     e.preventDefault();
     showStepById("step2");
   });
 
+
   toStep3.addEventListener("click", async (e) => {
-    const ok = window.NCR.utils.validateStep(document.getElementById("step2"));
-    if (!ok) { e.preventDefault(); return; }
+    const ok1 = window.NCR.utils.validateStep(document.getElementById("step2"));
+    const ok2 = validateBusinessRules('step2');
+    if (!ok1 || !ok2) { e.preventDefault(); return; }
     e.preventDefault();
     await trySaveDraft();
     window.NCR.utils.fillReview();
     showStepById("step3");
   });
 
+
   document.getElementById("backToStep1")?.addEventListener("click", (e) => {
     e.preventDefault();
     showStepById("step1");
   });
 
-document.getElementById("backToStep2")?.addEventListener("click", (e) => {
-  e.preventDefault();
-  showStepById("step2");
-});
- 
+  document.getElementById("backToStep2")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    showStepById("step2");
+  });
+
   var nc = document.getElementById("nonConforming");
   var ncLbl = document.getElementById("nonConformingLabel");
   if (nc && ncLbl) nc.addEventListener("change", () => ncLbl.textContent = nc.checked ? "Yes" : "No");
@@ -237,6 +430,9 @@ document.getElementById("backToStep2")?.addEventListener("click", (e) => {
         await trySaveDraft(false);
         var ncrNo = document.querySelector("[name='ncrNo']")?.value || "Draft";
         showSuccessModal("Draft Saved", `Your draft (${ncrNo}) has been saved.`);
+        const destDraft = returnTo || `view-ncr.html?status=pending&highlight=${encodeURIComponent(window.NCR.state.ncrId || "")}`;
+        const okDraftBtn = document.querySelector('#cfSuccessModal .btn.btn-primary');
+        okDraftBtn?.addEventListener('click', () => { window.location.href = destDraft; }, { once: true });
       } catch (err) {
         console.error(err);
         showSuccessModal("Save Failed", "Could not save draft: " + (err?.message || err));
@@ -250,11 +446,14 @@ document.getElementById("backToStep2")?.addEventListener("click", (e) => {
 
   document.getElementById("submitNcr").addEventListener("click", async function (e) {
     e.preventDefault();
-
+    if (!validateBusinessRules('submit')) return;
+    const isEdit = (mode === "edit");
     var ok = await showConfirmModal(
-      "Create NCR?",
-      "Please confirm you want to create this NCR. You can still edit it later.",
-      "Create"
+      isEdit ? "Update NCR?" : "Create NCR?",
+      isEdit
+        ? "Please confirm you want to update this NCR."
+        : "Please confirm you want to create this NCR. You can still edit it later.",
+      isEdit ? "Update" : "Create"
     );
     if (!ok) return;
 
@@ -312,13 +511,18 @@ document.getElementById("backToStep2")?.addEventListener("click", (e) => {
       }
 
       showSuccessModal(
-        "NCR Created",
-        `NCR #${saved.ncr_no} was created successfully.`
+        isEdit ? "NCR Updated" : "NCR Created",
+        isEdit
+          ? `NCR #${saved.ncr_no} was updated successfully.`
+          : `NCR #${saved.ncr_no} was created successfully.`
       );
 
-      window.NCR.utils.resetFormForNext();
-      await window.NCR.utils.setNcrNoField();
-      window.NCR.state.ncrId = null;
+      const dest = returnTo || `view-ncr.html?${isEdit ? "" : "status=open&"}highlight=${encodeURIComponent(saved.id)}`;
+      const okBtn = document.querySelector('#cfSuccessModal .btn.btn-primary');
+      okBtn?.addEventListener('click', () => {
+        window.location.href = dest;
+      }, { once: true });
+
 
     } catch (err) {
       console.error(err);

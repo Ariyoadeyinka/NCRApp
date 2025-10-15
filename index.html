@@ -86,26 +86,27 @@
             <h1>NCR Management System</h1>
             <p>Manage Non-Conformance Reports efficiently with Crossfire's comprehensive quality management platform</p>
         </div>
-
         <div class="status-boxes">
             <div class="container-fluid my-4 px-4">
                 <div class="row g-3">
                     <div class="col-12 col-sm-6 col-lg-3">
-                        <div class="status-box card border rounded-4 p-3 h-100">
+                        <div class="status-box card border rounded-4 p-3 h-100 cf-status-link" data-status="all"
+                            role="button" tabindex="0" aria-label="View all NCRs">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
                                     <div class="status-title text-muted small mb-1">Total NCRs</div>
-                                    <div class="status-value display-6 mb-0"  id="count-total">0</div>
+                                    <div class="status-value display-6 mb-0" id="count-total">0</div>
                                 </div>
                                 <div class="status-icon-file rounded-circle">
                                     <i class="fa-regular fa-file-lines"></i>
                                 </div>
                             </div>
                         </div>
-
                     </div>
+
                     <div class="col-12 col-sm-6 col-lg-3">
-                        <div class="status-box card border rounded-4 p-3 h-100">
+                        <div class="status-box card border rounded-4 p-3 h-100 cf-status-link" data-status="open"
+                            role="button" tabindex="0" aria-label="View open NCRs">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
                                     <div class="status-title text-muted small mb-1">Open Issues</div>
@@ -116,10 +117,11 @@
                                 </div>
                             </div>
                         </div>
-
                     </div>
+
                     <div class="col-12 col-sm-6 col-lg-3">
-                        <div class="status-box card border rounded-4 p-3 h-100">
+                        <div class="status-box card border rounded-4 p-3 h-100 cf-status-link" data-status="pending"
+                            role="button" tabindex="0" aria-label="View draft NCRs">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
                                     <div class="status-title text-muted small mb-1">Drafts</div>
@@ -130,10 +132,11 @@
                                 </div>
                             </div>
                         </div>
-
                     </div>
+
                     <div class="col-12 col-sm-6 col-lg-3">
-                        <div class="status-box card border rounded-4 p-3 h-100">
+                        <div class="status-box card border rounded-4 p-3 h-100 cf-status-link" data-status="closed"
+                            role="button" tabindex="0" aria-label="View completed NCRs">
                             <div class="d-flex align-items-start justify-content-between">
                                 <div>
                                     <div class="status-title text-muted small mb-1">Completed</div>
@@ -146,10 +149,10 @@
                         </div>
                     </div>
 
-
                 </div>
             </div>
         </div>
+
 
 
         <div class="divider-with-icon">
@@ -180,14 +183,14 @@
                 </div>
 
             </div>
-            
 
 
 
 
 
-            <div id="recent-ncr-list">\
-</div>
+
+            <div id="recent-ncr-list">
+            </div>
         </div>
 
     </main>
@@ -205,6 +208,7 @@
         </div>
     </footer>
     <script src="js/dashboard.js"></script>
+    <script src="js/script.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

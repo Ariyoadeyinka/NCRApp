@@ -30,7 +30,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         const s = String(status || "").toLowerCase();
         if (s === "closed") return { codeCls: "closed", badgeCls: "closed", iconCode: "fa-regular fa-circle-check", iconBadge: "fa-regular fa-circle-check", label: "Closed" };
         if (s === "pending") return { codeCls: "pending", badgeCls: "pending", iconCode: "fa-regular fa-clock", iconBadge: "fa-regular fa-clock", label: "Pending" };
-        // default open
         return { codeCls: "open", badgeCls: "open", iconCode: "fa-solid fa-triangle-exclamation", iconBadge: "fa-solid fa-triangle-exclamation", label: "Open" };
     }
 
@@ -108,6 +107,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         return res.json();
     }
 
+
     try {
         const [total, open, draft, closed, recent] = await Promise.all([
             fetchTotalCount(),
@@ -138,4 +138,38 @@ document.addEventListener("DOMContentLoaded", async function () {
     } catch (err) {
         console.error("Dashboard load failed:", err);
     }
+
+    (function makeStatusCardsClickable() {
+        const titleToStatus = (txt) => {
+            const t = (txt || "").trim().toLowerCase();
+            if (t.includes("total")) return "";
+            if (t.includes("open")) return "open";
+            if (t.includes("draft")) return "pending";
+            if (t.includes("completed") || t.includes("closed")) return "closed";
+            return "";
+        };
+
+        const cards = document.querySelectorAll(".status-box.card");
+        cards.forEach((card) => {
+            const titleEl = card.querySelector(".status-title");
+            const status = titleToStatus(titleEl?.textContent || "");
+
+            card.style.cursor = "pointer";
+            card.setAttribute("role", "button");
+            card.setAttribute("tabindex", "0");
+            card.setAttribute("aria-label", `Filter NCRs: ${status || "All"}`);
+
+            const go = () => {
+                const params = new URLSearchParams();
+                if (status) params.set("status", status);
+                window.location.href = `view-ncr.html${params.toString() ? "?" + params.toString() : ""}`;
+            };
+
+            card.addEventListener("click", go);
+            card.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+            });
+        });
+    })();
+
 });
