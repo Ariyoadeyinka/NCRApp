@@ -82,7 +82,7 @@
                         <fieldset class="cf-block cf-block-ncr">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label d-flex align-items-center gap-2">NCR No
+                                    <label class="form-label d-flex align-items-center gap-2">NCR No<span class="text-danger">*</span>
                                         <span class="cf-tip"
                                             data-tip="Auto-generated unique identifier; cannot be changed.">?</span>
                                     </label>
@@ -90,7 +90,7 @@
                                         readonly>
                                 </div>
                                 <div class="col-12 cf-supplier-field">
-                                    <label class="form-label d-flex align-items-center gap-2">Supplier Name
+                                    <label class="form-label d-flex align-items-center gap-2">Supplier Name<span class="text-danger">*</span>
                                         <span class="cf-tip"
                                             data-tip="Pick an existing supplier or choose ‘+ Add New Supplier’.">?</span>
                                     </label>
@@ -113,22 +113,22 @@
                                     </div>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label d-flex align-items-center gap-2">Product No
+                                    <label class="form-label d-flex align-items-center gap-2">Product No<span class="text-danger">*</span>
                                         <span class="cf-tip" data-tip="Part number from PO/label/drawing.">?</span>
                                     </label>
                                     <input class="form-control form-control-lg bg-body-tertiary" name="productNo"
-                                        placeholder="Enter product number" required>
+                                        placeholder="Enter Product Number (e.g., PROD-1234)" required>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label d-flex align-items-center gap-2">Sales Order No
+                                    <label class="form-label d-flex align-items-center gap-2">Sales Order No<span class="text-danger">*</span>
                                         <span class="cf-tip"
                                             data-tip="Related sales order number (if applicable).">?</span>
                                     </label>
                                     <input class="form-control form-control-lg bg-body-tertiary" name="soNo"
-                                        placeholder="Enter sales order number" required>
+                                        placeholder="Enter sales order number (e.g., SO-1234)" required>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label d-flex align-items-center gap-2">Date Raised
+                                    <label class="form-label d-flex align-items-center gap-2">Date Raised<span class="text-danger">*</span>
                                         <span class="cf-tip"
                                             data-tip="Date the non-conformance was identified.">?</span>
                                     </label>
@@ -136,7 +136,7 @@
                                         value="2025-10-03" readonly>
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label d-flex align-items-center gap-2">Closed Date
+                                    <label class="form-label d-flex align-items-center gap-2">Closed Date<span class="text-danger">*</span>
                                         <span class="cf-tip" data-tip="Leave as N/A until the NCR is closed.">?</span>
                                     </label>
                                     <input class="form-control form-control-lg disabled-form" name="dateClosed"
@@ -166,7 +166,7 @@
                         <fieldset class="cf-block cf-block-quality">
                             <div class="row g-3">
                                 <div class="col-12 col-md-6 col-lg-3">
-                                    <label class="form-label d-flex align-items-center gap-2">WIP PRO
+                                    <label class="form-label d-flex align-items-center gap-2">WIP PRO<span class="text-danger">*</span>
                                         <span class="cf-tip" data-tip="Is this item part of Work-In-Process?">?</span>
                                     </label>
                                     <div class="btn-group w-100" role="group" aria-label="WIP">
@@ -178,7 +178,7 @@
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label d-flex align-items-center gap-2">Item Marked as
-                                        Non-Conforming
+                                        Non-Conforming<span class="text-danger">*</span>
                                         <span class="cf-tip"
                                             data-tip="Enable if the item is officially flagged as non-conforming.">?</span>
                                     </label>
@@ -190,14 +190,14 @@
                                     </div>
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
-                                    <label class="form-label d-flex align-items-center gap-2">Quantity Supplied
+                                    <label class="form-label d-flex align-items-center gap-2">Quantity Supplied<span class="text-danger">*</span>
                                         <span class="cf-tip" data-tip="Total quantity received for this item.">?</span>
                                     </label>
                                     <input type="number" min="0" class="form-control bg-body-tertiary"
                                         name="qtySupplied" placeholder="Total quantity supplied" required>
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
-                                    <label class="form-label d-flex align-items-center gap-2">Quantity Defective
+                                    <label class="form-label d-flex align-items-center gap-2">Quantity Defective<span class="text-danger">*</span>
                                         <span class="cf-tip" data-tip="How many pieces are non-conforming.">?</span>
                                     </label>
                                     <input type="number" min="0" class="form-control bg-body-tertiary"

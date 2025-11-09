@@ -70,6 +70,9 @@
     if (!list) {
       list = document.createElement("div");
       list.id = "ncrList";
+      // 👇 Make this a responsive grid: 1 col on mobile, 2 on md+
+      list.className = "row row-cols-1 row-cols-md-2 g-3";
+
       const filtersRow = document.querySelector(".row.mb-4.g-2") || document.querySelector(".row.g-2");
       if (filtersRow?.parentElement) {
         filtersRow.parentElement.insertBefore(list, filtersRow.nextSibling);
@@ -160,35 +163,36 @@
     const nextBadge = nextDeptBadge(n);
 
     return `
-<div class="card p-4 mb-4 shadow-sm border rounded-3" style="border-radius: 12px;" data-id="${n.id}">
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-    <div class="min-w-0">
-      <h5 class="fw-semibold text-dark mb-1 text-truncate">${n.ncr_no || ""}</h5>
-      <div class="text-muted small">
-        ${n.product_no ? `<span>Product-No: <span class="text-dark">${n.product_no}</span></span>` : ""}
-        ${n.so_no ? `<span class="ms-2">Sales-Order No: <span class="text-dark">${n.so_no}</span></span>` : ""}
+<div class="col">
+  <div class="card p-4 mb-4 shadow-sm border rounded-3" style="border-radius: 12px;" data-id="${n.id}">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div class="min-w-0">
+        <h5 class="fw-semibold text-dark mb-1 text-truncate">${n.ncr_no || ""}</h5>
+        <div class="text-muted small">
+          ${n.product_no ? `<span>Product-No: <span class="text-dark">${n.product_no}</span></span>` : ""}
+          ${n.so_no ? `<span class="ms-2">Sales-Order No: <span class="text-dark">${n.so_no}</span></span>` : ""}
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        ${nextBadge}
+        ${statusBadge(n.status)}
       </div>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      ${nextBadge}
-      ${statusBadge(n.status)}
-    </div>
-  </div>
 
-  <div class="row mt-3 g-3">
-    <div class="col-md-6">
-      <p class="mb-1"><span class="text-muted">Quality Rep:</span> <span class="text-dark">${n.rep_name || "—"}</span></p>
-      <p class="mb-1"><span class="text-muted">Process:</span> <span class="text-dark">${processText}</span></p>
-      ${supplierName ? `<p class="mb-1"><span class="text-muted">Supplier:</span> <span class="text-dark">${supplierName}</span></p>` : ""}
+    <div class="row mt-3 g-3">
+      <div class="col-md-6">
+        <p class="mb-1"><span class="text-muted">Quality Rep:</span> <span class="text-dark">${n.rep_name || "—"}</span></p>
+        <p class="mb-1"><span class="text-muted">Process:</span> <span class="text-dark">${processText}</span></p>
+        ${supplierName ? `<p class="mb-1"><span class="text-muted">Supplier:</span> <span class="text-dark">${supplierName}</span></p>` : ""}
+      </div>
+      <div class="col-md-6">
+        ${qtyText ? `<p class="mb-1"><span class="text-muted">Qty Defective:</span> <span class="text-dark">${qtyText}</span></p>` : ""}
+        <p class="mb-1"><span class="text-muted">Date Created:</span> <span class="text-dark">${fmtDate(n.date_raised)}</span></p>
+      </div>
     </div>
-    <div class="col-md-6">
-      ${qtyText ? `<p class="mb-1"><span class="text-muted">Qty Defective:</span> <span class="text-dark">${qtyText}</span></p>` : ""}
-      <p class="mb-1"><span class="text-muted">Date Created:</span> <span class="text-dark">${fmtDate(n.date_raised)}</span></p>
-    </div>
-  </div>
 
-  <div class="d-flex justify-content-end gap-2 mt-3">
-    ${isDraft
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      ${isDraft
         ? `<a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
              <i class="fa fa-play me-1"></i> Continue
            </a>`
@@ -199,7 +203,8 @@
            </button>
            <button class="btn btn-outline-dark" data-action="edit"><i class="fa fa-pen me-1"></i> Edit</button>
          `}
-    <button class="btn btn-outline-secondary btn-sm" data-action="archive"><i class="bi bi-archive"></i> Archive</button>
+      <button class="btn btn-outline-secondary btn-sm" data-action="archive"><i class="bi bi-archive"></i> Archive</button>
+    </div>
   </div>
 </div>`;
   }
