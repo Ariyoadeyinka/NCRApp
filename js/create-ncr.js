@@ -1,5 +1,53 @@
 // js/create-ncr.js
 document.addEventListener("DOMContentLoaded", async function () {
+
+  const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
+  const SUPABASE_ANON =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+
+  async function notifAuthHeaders() {
+    try {
+      if (window.NCR?.auth?.client) {
+        const {
+          data: { session },
+        } = await window.NCR.auth.client.auth.getSession();
+
+        if (session && session.access_token) {
+          return {
+            apikey: SUPABASE_ANON,
+            Authorization: `Bearer ${session.access_token}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("notif: failed to get auth session, using anon", e);
+    }
+
+    return {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${SUPABASE_ANON}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    };
+  }
+
+  async function createNotificationRow(payload) {
+    const headers = await notifAuthHeaders();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ncr_notifications`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.warn("failed to create notification", res.status, await res.text());
+    }
+  }
+
   await (window.NCR.auth?.requireLogin?.());
   // state holder for current draft id
   window.NCR = window.NCR || {};
@@ -558,9 +606,11 @@ document.addEventListener("DOMContentLoaded", async function () {
       if (await shouldSetEngineeringOnUpdate(window.NCR.state.ncrId)) {
         applyEngineeringStage(payload);
       }
+
       let saved;
 
       if (window.NCR.state.ncrId) {
+        // UPDATE existing NCR
         const { data, error } = await sb
           .from("ncrs")
           .update(payload)
@@ -570,6 +620,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         if (error) throw error;
         saved = data;
       } else {
+        // INSERT new NCR
         const { data, error } = await sb
           .from("ncrs")
           .insert([payload])
@@ -580,6 +631,21 @@ document.addEventListener("DOMContentLoaded", async function () {
         window.NCR.state.ncrId = saved?.id;
       }
 
+      // 🔔 NEW: notify ENGINEERING when a Quality NCR goes into engineering
+      try {
+        // Only send this on create, not on simple edit of an already-open NCR
+        if (!isEdit) {
+          await createNotificationRow({
+            ncr_id: saved.id,  // ✅ REQUIRED by your ncr_notifications table
+            message: `New NCR #${saved.ncr_no} was created by Quality and is awaiting Engineering review.`,
+            recipient_role: "engineering", // or "engineer" if that's your role code
+            type: "ncr_created",
+            link: `/engineering/review.html?ncrId=${encodeURIComponent(saved.id)}`
+          });
+        }
+      } catch (e) {
+        console.warn("failed to create engineering notification", e);
+      }
 
 
       showSuccessModal(
@@ -588,6 +654,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           ? `NCR #${saved.ncr_no} was updated successfully.`
           : `NCR #${saved.ncr_no} was created successfully.`
       );
+
 
       const dest = returnTo || `view-ncr.html?${isEdit ? "" : "status=open&"}highlight=${encodeURIComponent(saved.id)}`;
       const okBtn = document.querySelector('#cfSuccessModal .btn.btn-primary');
