@@ -816,6 +816,7 @@ main {
 footer.app-footer {
     margin-top: auto;
 }
+
 input.form-control.disabled-form[readonly],
 input.form-control.disabled-form:disabled {
     background-color: #e0e0e0 !important;
@@ -823,13 +824,20 @@ input.form-control.disabled-form:disabled {
     border: none;
     opacity: 1 !important;
 }
-.create-new-ncr{
-    background-color:  #f8f9fa;
+
+.create-new-ncr {
+    background-color: #f8f9fa;
     color: #173451;
     border: 1.5px solid #173451;
 }
 
-.create-new-ncr:hover{
+.create-new-ncr:hover {
     background-color: #173451;
     color: white;
+}
+
+.notif-read {
+    filter: blur(1.5px);
+    opacity: 0.6;
+    transition: all 0.25s ease;
 }

@@ -1,260 +1,289 @@
 // js/nav-notifications.js
 (function () {
-  const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
-  const SUPABASE_ANON =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+    const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
+    const SUPABASE_ANON =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
 
-  const q = (s) => document.querySelector(s);
+    const q = (s) => document.querySelector(s);
+    const READ_KEY = "cf_notif_read_ids";
 
-  // --- Role helper ---------------------------------------------------------
-  function getCurrentRole() {
-    try {
-      return (localStorage.getItem("cf_role") || "").toLowerCase().trim();
-    } catch {
-      return "";
+    // Keep the full list of notification IDs currently loaded for this role
+    let lastNotificationIds = [];
+
+    // --- Role helper ---------------------------------------------------------
+    function getCurrentRole() {
+        try {
+            return (localStorage.getItem("cf_role") || "").toLowerCase().trim();
+        } catch {
+            return "";
+        }
     }
-  }
 
-  // --- Auth helpers --------------------------------------------------------
-  async function authHeaders() {
-    try {
-      if (window.NCR?.auth?.client) {
-        const {
-          data: { session },
-        } = await window.NCR.auth.client.auth.getSession();
+    function withApiKeyInUrl(url) {
+        try {
+            const u = new URL(url, location.origin);
+            if (!u.searchParams.get("apikey")) {
+                u.searchParams.set("apikey", SUPABASE_ANON);
+            }
+            return u.toString();
+        } catch {
+            const sep = url.includes("?") ? "&" : "?";
+            return `${url}${sep}apikey=${encodeURIComponent(SUPABASE_ANON)}`;
+        }
+    }
 
-        if (session && session.access_token) {
-          return {
+    async function fetchJson(url) {
+        const finalUrl = withApiKeyInUrl(url);
+
+        const headers = {
             apikey: SUPABASE_ANON,
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${SUPABASE_ANON}`,
             Accept: "application/json",
-          };
+        };
+
+        const res = await fetch(finalUrl, { headers });
+        if (!res.ok) {
+            const body = await res.text().catch(() => "");
+            throw new Error(`HTTP ${res.status}: ${body}`);
         }
-      }
-    } catch (e) {
-      console.warn(
-        "nav-notifications: failed to get auth session, falling back to anon",
-        e
-      );
+        return res.json();
     }
 
-    return {
-      apikey: SUPABASE_ANON,
-      Authorization: `Bearer ${SUPABASE_ANON}`,
-      Accept: "application/json",
-    };
-  }
-
-  function withApiKeyInUrl(url) {
-    try {
-      const u = new URL(url, location.origin);
-      if (!u.searchParams.get("apikey")) {
-        u.searchParams.set("apikey", SUPABASE_ANON);
-      }
-      return u.toString();
-    } catch {
-      const sep = url.includes("?") ? "&" : "?";
-      return `${url}${sep}apikey=${encodeURIComponent(SUPABASE_ANON)}`;
-    }
-  }
-
-  async function fetchJson(url) {
-    const finalUrl = withApiKeyInUrl(url);
-    const headers = await authHeaders();
-
-    const res = await fetch(finalUrl, { headers });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      const err = new Error(`HTTP ${res.status} — ${body}`);
-      err.status = res.status;
-      err.body = body;
-      throw err;
-    }
-    return res.json();
-  }
-
-  function fmtTime(d) {
-    if (!d) return "";
-    const dt = new Date(d);
-    if (Number.isNaN(dt.getTime())) return "";
-    const yyyy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, "0");
-    const dd = String(dt.getDate()).padStart(2, "0");
-    const hh = String(dt.getHours()).padStart(2, "0");
-    const min = String(dt.getMinutes()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
-  }
-
-  // --- Main loader ---------------------------------------------------------
-  async function loadNotifications() {
-    const badge = q("#notifBadge");
-    const list = q("#notifList");
-    if (!badge || !list) {
-      console.warn(
-        "nav-notifications: missing #notifBadge or #notifList in DOM"
-      );
-      return;
+    function fmtTime(d) {
+        if (!d) return "";
+        const dt = new Date(d);
+        if (Number.isNaN(dt.getTime())) return "";
+        const yyyy = dt.getFullYear();
+        const mm = String(dt.getMonth() + 1).padStart(2, "0");
+        const dd = String(dt.getDate()).padStart(2, "0");
+        const hh = String(dt.getHours()).padStart(2, "0");
+        const min = String(dt.getMinutes()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
     }
 
-    try {
-      const rawRole = getCurrentRole();
-      console.debug("nav-notifications: current cf_role =", rawRole);
-
-      const url =
-        `${SUPABASE_URL}/rest/v1/ncr_notifications` +
-        `?select=id,message,created_at,read,link,type,recipient_role` +
-        `&order=created_at.desc&limit=20`;
-
-      const rows = await fetchJson(url);
-      console.debug("nav-notifications: raw rows =", rows);
-
-      list.innerHTML = "";
-
-      // --- Role-based filtering (client-side) ------------------------------
-      const displayRows = (() => {
-        if (!rows || rows.length === 0) return [];
-
-        if (!rawRole) {
-          // no role – just show everything you got
-          return rows;
+    // --- localStorage helpers for read state ---------------------------------
+    function getReadSet() {
+        try {
+            const raw = localStorage.getItem(READ_KEY);
+            if (!raw) return new Set();
+            const arr = JSON.parse(raw);
+            return new Set(Array.isArray(arr) ? arr : []);
+        } catch {
+            return new Set();
         }
+    }
 
-        const role = rawRole.toLowerCase();
+    function saveReadSet(set) {
+        try {
+            localStorage.setItem(READ_KEY, JSON.stringify(Array.from(set)));
+        } catch {
+            // ignore
+        }
+    }
 
-        return rows.filter((n) => {
-          const rRole = (n.recipient_role || "all").toLowerCase();
+    // -------------------------------------------------------------------------
+    // Badge: based on ALL notifications for this role (not just the 5 shown)
+    // -------------------------------------------------------------------------
+    function updateBadgeFromState() {
+        const badge = q("#notifBadge");
+        if (!badge) return;
 
-          // "all" goes to everyone
-          if (rRole === "all") return true;
+        const readSet = getReadSet();
+        const unread = lastNotificationIds.filter((id) => !readSet.has(id)).length;
 
-          // admin sees all notifications
-          if (role === "admin") return true;
-
-          // engineers: engineering / engineer only
-          if (role === "engineer" || role === "engineering") {
-            return (
-              rRole === "engineering" ||
-              rRole === "engineer" ||
-              rRole === "all"
-            );
-          }
-
-          // quality department
-          if (role === "quality" || role === "quality_control") {
-            return (
-              rRole === "quality" ||
-              rRole === "quality_control" ||
-              rRole === "all"
-            );
-          }
-
-          // fallback: exact role match + "all"
-          return rRole === role;
-        });
-      })();
-
-      if (!displayRows || displayRows.length === 0) {
-        list.innerHTML = `
-          <div class="list-group-item border-0 py-3 text-muted">
-            No notifications for your role.
-          </div>`;
-        badge.classList.add("d-none");
-        badge.textContent = "0";
-        return;
-      }
-
-      let unreadCount = 0;
-
-      displayRows.forEach((n) => {
-        if (!n.read) unreadCount++;
-
-        const safeMsg = n.message || "";
-        const time = fmtTime(n.created_at);
-        const roleLabel = (n.recipient_role || "all").toLowerCase();
-
-        const base =
-          '<div class="d-flex justify-content-between align-items-start">' +
-          `<div class="fw-semibold ${n.read ? "" : "text-dark"}">` +
-          `${safeMsg}</div>` +
-          `${
-            !n.read
-              ? '<span class="badge rounded-pill bg-primary-subtle text-primary ms-2 small">New</span>'
-              : ""
-          }` +
-          "</div>" +
-          `<div class="d-flex justify-content-between align-items-center mt-1">` +
-          `<small class="text-muted">${time}</small>` +
-          `<span class="badge rounded-pill bg-light text-muted border ms-2 small">${roleLabel}</span>` +
-          `</div>`;
-
-        if (n.link) {
-          list.insertAdjacentHTML(
-            "beforeend",
-            `
-            <a href="${n.link}"
-               class="list-group-item list-group-item-action border-0 py-3 d-flex flex-column">
-              ${base}
-            </a>`
-          );
+        if (unread <= 0) {
+            badge.textContent = "0";
+            badge.classList.add("d-none");
         } else {
-          list.insertAdjacentHTML(
-            "beforeend",
-            `
-            <div class="list-group-item border-0 py-3 d-flex flex-column">
-              ${base}
-            </div>`
-          );
+            badge.textContent = unread > 9 ? "9+" : String(unread);
+            badge.classList.remove("d-none");
         }
-      });
-
-      if (unreadCount > 0) {
-        badge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
-        badge.classList.remove("d-none");
-      } else {
-        badge.textContent = "0";
-        badge.classList.add("d-none");
-      }
-    } catch (err) {
-      console.warn("Failed to load notifications:", err);
-      const msg = err && err.message ? err.message : String(err);
-      if (list) {
-        list.innerHTML = `
-          <div class="list-group-item border-0 py-3 text-danger small">
-            Could not load notifications.<br/>
-            <code>${msg}</code>
-          </div>`;
-      }
-      if (badge) {
-        badge.classList.add("d-none");
-        badge.textContent = "0";
-      }
     }
-  }
 
-  // --- Init ---------------------------------------------------------------
-  document.addEventListener("DOMContentLoaded", () => {
-    (async () => {
-      try {
-        if (window.NCR?.auth?.requireLogin) {
-          await window.NCR.auth.requireLogin();
+    // -------------------------------------------------------------------------
+    // MAIN: Load notifications
+    // -------------------------------------------------------------------------
+    async function loadNotifications() {
+        const badge = q("#notifBadge");
+        const list = q("#notifList");
+
+        if (!badge || !list) return;
+
+        try {
+            const rawRole = getCurrentRole();
+            const readSet = getReadSet();
+
+            const rows = await fetchJson(
+                `${SUPABASE_URL}/rest/v1/ncr_notifications?select=id,message,created_at,read,link,type,recipient_role&order=created_at.desc&limit=50`
+            );
+
+            list.innerHTML = "";
+            lastNotificationIds = [];
+
+            // ---- Role filter -----------------------------------------------------
+            let displayRows = [];
+            if (!rawRole) {
+                displayRows = rows;
+            } else {
+                const role = rawRole.toLowerCase();
+                displayRows = rows.filter((n) => {
+                    const rRole = (n.recipient_role || "all").toLowerCase();
+                    if (rRole === "all") return true;
+                    if (role === "admin") return true;
+                    if (role.includes("engineer")) {
+                        return ["engineering", "engineer", "all"].includes(rRole);
+                    }
+                    if (role.includes("quality")) {
+                        return ["quality", "quality_control", "all"].includes(rRole);
+                    }
+                    return rRole === role;
+                });
+            }
+
+            // Track all notification IDs for badge purposes
+            lastNotificationIds = displayRows.map((n) => String(n.id));
+
+            if (displayRows.length === 0) {
+                list.innerHTML = `<div class="list-group-item border-0 py-3 text-muted">No notifications for your role.</div>`;
+                lastNotificationIds = [];
+                updateBadgeFromState();
+                return;
+            }
+
+            // ---- Compute TOTAL unread across all notifications for this role -----
+            const unreadTotal = displayRows.reduce((acc, n) => {
+                const id = String(n.id);
+                const isRead = n.read || readSet.has(id);
+                return acc + (isRead ? 0 : 1);
+            }, 0);
+
+            // ---- Render only the latest 5 in the dropdown ------------------------
+            const maxToShow = 5;
+            const rowsForDropdown = displayRows.slice(0, maxToShow);
+
+            rowsForDropdown.forEach((n) => {
+                const time = fmtTime(n.created_at);
+                const id = String(n.id);
+                const isRead = n.read || readSet.has(id);
+
+                const newBadge = isRead
+                    ? ""
+                    : `<span class="badge bg-primary-subtle text-primary small new-badge">New</span>`;
+
+                const content = `
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="fw-semibold ${isRead ? "text-muted" : ""}">${n.message}</div>
+            <div class="ms-2">
+              ${newBadge}
+            </div>
+          </div>
+          <small class="text-muted mt-1">${time}</small>
+        `;
+
+                if (n.link) {
+                    list.insertAdjacentHTML(
+                        "beforeend",
+                        `<a href="${n.link}" class="list-group-item list-group-item-action border-0 py-3" data-id="${id}">${content}</a>`
+                    );
+                } else {
+                    list.insertAdjacentHTML(
+                        "beforeend",
+                        `<div class="list-group-item border-0 py-3" data-id="${id}">${content}</div>`
+                    );
+                }
+            });
+
+            // Footer: Mark all
+            list.insertAdjacentHTML(
+                "beforeend",
+                `
+          <div class="list-group-item border-top py-2 text-center">
+            <button type="button" class="btn btn-sm btn-light mark-all-read-btn">
+              Mark all as read
+            </button>
+          </div>`
+            );
+
+            // Set badge from TOTAL unread (not just the visible 5)
+            if (unreadTotal > 0) {
+                badge.textContent = unreadTotal > 9 ? "9+" : unreadTotal.toString();
+                badge.classList.remove("d-none");
+            } else {
+                badge.textContent = "0";
+                badge.classList.add("d-none");
+            }
+        } catch (error) {
+            console.warn("nav-notifications: loadNotifications failed", error);
+            list.innerHTML = `<div class="list-group-item text-danger small">Could not load notifications.</div>`;
+            lastNotificationIds = [];
+            updateBadgeFromState();
         }
-      } catch (e) {
-        console.warn(
-          "nav-notifications: requireLogin failed / not available",
-          e
-        );
-      }
+    }
 
-      loadNotifications();
-    })();
+    // -------------------------------------------------------------------------
+    // UI-ONLY READ LOGIC (NO DB PATCHES, PERSISTS VIA localStorage)
+    // -------------------------------------------------------------------------
+    document.addEventListener("click", (ev) => {
+        const all = ev.target.closest(".mark-all-read-btn");
+        const notifItem = ev.target.closest("#notifList [data-id]");
 
-    const notifMenu = q("#notifMenu");
-    if (notifMenu) {
-      notifMenu.addEventListener("click", () => {
+        // MARK ALL AS READ (UI + localStorage, for ALL notifications, not just 5)
+        if (all) {
+            ev.preventDefault();
+
+            const readSet = getReadSet();
+
+            // Mark ALL loaded notifications for this role as read
+            lastNotificationIds.forEach((id) => {
+                readSet.add(String(id));
+            });
+            saveReadSet(readSet);
+
+            // Update current dropdown DOM visually
+            document
+                .querySelectorAll("#notifList [data-id]")
+                .forEach((el) => {
+                    const badgeEl = el.querySelector(".new-badge");
+                    if (badgeEl) badgeEl.remove();
+                    el.classList.add("notif-read");
+                });
+
+            updateBadgeFromState();
+            return;
+        }
+
+        // SINGLE NOTIFICATION CLICK (UI + localStorage)
+        if (notifItem) {
+            const id = notifItem.getAttribute("data-id");
+            if (!id) return;
+
+            const badgeEl = notifItem.querySelector(".new-badge");
+            if (!badgeEl) {
+                // already marked as read
+                return;
+            }
+
+            const readSet = getReadSet();
+            readSet.add(String(id));
+            saveReadSet(readSet);
+
+            badgeEl.remove();
+            notifItem.classList.add("notif-read");
+
+            updateBadgeFromState();
+            // allow navigation if it's an <a>
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // Init
+    // -------------------------------------------------------------------------
+    document.addEventListener("DOMContentLoaded", () => {
         loadNotifications();
-      });
-    } else {
-      console.warn("nav-notifications: #notifMenu not found");
-    }
-  });
+
+        const notifMenu = q("#notifMenu");
+        if (notifMenu) {
+            notifMenu.addEventListener("click", () => loadNotifications());
+        }
+    });
 })();
