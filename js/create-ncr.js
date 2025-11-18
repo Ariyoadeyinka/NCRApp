@@ -640,7 +640,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             message: `New NCR #${saved.ncr_no} was created by Quality and is awaiting Engineering review.`,
             recipient_role: "engineering", // or "engineer" if that's your role code
             type: "ncr_created",
-            link: `/engineering/review.html?ncrId=${encodeURIComponent(saved.id)}`
+            link: `engineering-review.html?ncrId=${encodeURIComponent(saved.id)}`
           });
         }
       } catch (e) {

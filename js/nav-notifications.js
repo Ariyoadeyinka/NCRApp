@@ -6,6 +6,16 @@
 
   const q = (s) => document.querySelector(s);
 
+  // --- Role helper ---------------------------------------------------------
+  function getCurrentRole() {
+    try {
+      return (localStorage.getItem("cf_role") || "").toLowerCase().trim();
+    } catch {
+      return "";
+    }
+  }
+
+  // --- Auth helpers --------------------------------------------------------
   async function authHeaders() {
     try {
       if (window.NCR?.auth?.client) {
@@ -75,6 +85,7 @@
     return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
   }
 
+  // --- Main loader ---------------------------------------------------------
   async function loadNotifications() {
     const badge = q("#notifBadge");
     const list = q("#notifList");
@@ -86,20 +97,66 @@
     }
 
     try {
+      const rawRole = getCurrentRole();
+      console.debug("nav-notifications: current cf_role =", rawRole);
+
       const url =
         `${SUPABASE_URL}/rest/v1/ncr_notifications` +
         `?select=id,message,created_at,read,link,type,recipient_role` +
         `&order=created_at.desc&limit=20`;
 
       const rows = await fetchJson(url);
-      console.debug("nav-notifications: raw rows=", rows);
+      console.debug("nav-notifications: raw rows =", rows);
 
       list.innerHTML = "";
 
-      if (!rows || rows.length === 0) {
+      // --- Role-based filtering (client-side) ------------------------------
+      const displayRows = (() => {
+        if (!rows || rows.length === 0) return [];
+
+        if (!rawRole) {
+          // no role – just show everything you got
+          return rows;
+        }
+
+        const role = rawRole.toLowerCase();
+
+        return rows.filter((n) => {
+          const rRole = (n.recipient_role || "all").toLowerCase();
+
+          // "all" goes to everyone
+          if (rRole === "all") return true;
+
+          // admin sees all notifications
+          if (role === "admin") return true;
+
+          // engineers: engineering / engineer only
+          if (role === "engineer" || role === "engineering") {
+            return (
+              rRole === "engineering" ||
+              rRole === "engineer" ||
+              rRole === "all"
+            );
+          }
+
+          // quality department
+          if (role === "quality" || role === "quality_control") {
+            return (
+              rRole === "quality" ||
+              rRole === "quality_control" ||
+              rRole === "all"
+            );
+          }
+
+          // fallback: exact role match + "all"
+          return rRole === role;
+        });
+      })();
+
+      if (!displayRows || displayRows.length === 0) {
         list.innerHTML = `
           <div class="list-group-item border-0 py-3 text-muted">
-            No notifications.
+            No notifications for your role.
           </div>`;
         badge.classList.add("d-none");
         badge.textContent = "0";
@@ -108,7 +165,7 @@
 
       let unreadCount = 0;
 
-      rows.forEach((n) => {
+      displayRows.forEach((n) => {
         if (!n.read) unreadCount++;
 
         const safeMsg = n.message || "";
@@ -174,6 +231,7 @@
     }
   }
 
+  // --- Init ---------------------------------------------------------------
   document.addEventListener("DOMContentLoaded", () => {
     (async () => {
       try {

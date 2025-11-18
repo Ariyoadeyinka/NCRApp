@@ -3,6 +3,19 @@
   const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
   const SUPABASE_ANON =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+  let currentSession = null;
+
+  async function authHeaders(extra = {}) {
+    if (!currentSession) throw new Error("Not authenticated");
+
+    return {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${currentSession.access_token}`, // ✅ user token
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...extra,
+    };
+  }
 
   // ---- role helpers (populated by login.js) ----
   function getRoles() {
@@ -37,7 +50,7 @@
     document.getElementById("statusFilter") || document.querySelector("select");
   if (urlStatus && statusSelect) {
     const v = urlStatus.toLowerCase();
-    const allowed = new Set(["open", "pending", "closed"]);
+    const allowed = new Set(["open", "pending", "closed", "sent_back"]);
     statusSelect.value = allowed.has(v) ? v : "";
   }
 
@@ -166,6 +179,9 @@
     if (s === "closed") {
       return `<span class="badge rounded-pill bg-success bg-opacity-25 text-success fw-semibold me-2 px-3 py-1">CLOSED</span>`;
     }
+    if (s === "sent_back") {
+      return `<span class="badge rounded-pill bg-danger bg-opacity-25 text-danger fw-semibold me-2 px-3 py-1">SENT BACK</span>`;
+    }
     if (s === "pending" || s === "draft") {
       return `<span class="badge rounded-pill bg-warning bg-opacity-25 text-dark fw-semibold me-2 px-3 py-1">DRAFT</span>`;
     }
@@ -225,6 +241,9 @@
     const statusLower = String(n.status || "").toLowerCase();
     const isDraft = statusLower === "pending" || statusLower === "draft";
 
+    const isSentBack =
+      statusLower === "sent_back" &&
+      String(n.current_stage || "").toLowerCase() === "quality";
     // role flags
     const engineerOnly = hasRole("engineering") && !isAdmin();
     const qualityOnly = hasRole("quality") && !hasRole("engineering") && !isAdmin();
@@ -255,7 +274,8 @@
           </button>`;
       }
     } else if (qualityOnly && !adminUser) {
-      if (isDraft) {
+      if (isDraft || isSentBack) {
+        // quality can continue editing drafts and sent-back NCRs
         actionsHtml += `
           <a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
             <i class="fa fa-play me-1"></i> Continue
@@ -275,7 +295,7 @@
       }
     } else {
       // admin / others
-      if (isDraft) {
+      if (isDraft || isSentBack) {
         actionsHtml += `
           <a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
             <i class="fa fa-play me-1"></i> Continue
@@ -309,6 +329,7 @@
       <div class="d-flex align-items-center gap-2 flex-wrap">
         ${stagePill(n.current_stage)}
         ${statusBadge(n.status)}
+        ${isSentBack ? `<span class="badge rounded-pill bg-light text-danger fw-semibold px-3 py-1">Sent back from Engineering</span>` : ""}
       </div>
     </div>
 
@@ -352,13 +373,18 @@
       filters.push("archived=is.false");
 
       if (engineer) {
-        // ENGINEER: ONLY items whose CURRENT stage is engineering (no drafts)
-        filters.push("current_stage=eq.engineering");
+        // ENGINEER:
+        // - See NCRs in ENGINEERING or OPERATIONS
+        // - Hide drafts/pending
+        filters.push("whose_turn_dept=eq.engineering");
         filters.push("status=neq.pending");
         filters.push("status=neq.draft");
+        //filters.push("status=neq.sent_back");
       } else if (quality) {
-        // QUALITY: show items in the quality stage (drafts + in-flight)
-        filters.push("current_stage=eq.quality");
+        // QUALITY:
+        // - See ALL non-archived NCRs (any stage),
+        //   so they can always see the NCRs they created and anything sent back.
+        // (No extra stage filter)
       }
     }
 
@@ -400,38 +426,44 @@
     return { rows: normalized, total };
   }
 
-  async function archiveNcr(id) {
+
+  async function patchNcr(id, payload) {
     const base = `${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`;
-    await fetchJson(base, {
+
+    const finalUrl = withApiKeyInUrl(base);
+    const res = await fetch(finalUrl, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({ archived: true }),
+      headers: await authHeaders({ Prefer: "return=minimal" }),
+      body: JSON.stringify(payload),
     });
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      console.error("NCR PATCH failed:", res.status, msg);
+      throw new Error(`NCR update failed (${res.status}): ${msg}`);
+    }
+  }
+
+
+
+  async function archiveNcr(id) {
+    await patchNcr(id, { archived: true });
     return { mode: "archived_flag" };
   }
 
-  // ---- send back to quality (ENGINEERS ONLY) ----
+
+
   async function sendBackToQuality(id, n) {
-    const base = `${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`;
     const now = new Date().toISOString();
-    await fetchJson(base, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Prefer: "return=representation",
-      },
-      body: JSON.stringify({
-        status: "pending",        // back to draft
-        current_stage: "quality", // back to quality stage
-        date_closed: null,
-        updated_at: now,
-      }),
+
+    await patchNcr(id, {
+      status: "sent_back",
+      current_stage: "quality",
+      engineer_decision: "sent_back",
+      date_closed: null,
+      updated_at: now,
     });
 
-    // Notify QUALITY that NCR was sent back
     await createNcrNotification({
       ncrId: id,
       type: "sent_back_to_quality",
@@ -439,7 +471,15 @@
       message: `NCR ${n.ncr_no || ""} was sent back to Quality by Engineering for rework.`,
       link: `create-ncr.html?ncrId=${id}&mode=edit`,
     });
+
+    return n;
   }
+
+
+
+
+
+
 
   function ensureViewModal() {
     if (document.getElementById("ncrViewModal")) return;
@@ -581,6 +621,9 @@
     } else if (s === "closed") {
       pill.classList.add("bg-success", "bg-opacity-25", "text-success");
       pill.textContent = "CLOSED";
+    } else if (s === "sent_back") {
+      pill.classList.add("bg-danger", "bg-opacity-25", "text-danger");
+      pill.textContent = "SENT BACK";
     } else if (s === "pending" || s === "draft") {
       pill.classList.add("bg-warning", "bg-opacity-25", "text-dark");
       pill.textContent = "DRAFT";
@@ -815,7 +858,7 @@
 
     const session = await window.NCR.auth.requireLogin();
     if (!session) return;
-
+    currentSession = session;
     ensureListContainer();
     ensureViewModal();
     ensurePagerContainer();
