@@ -1,14 +1,19 @@
 // js/nav-notifications.js
 (function () {
-    const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
-    const SUPABASE_ANON =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+   const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
+  const SUPABASE_ANON =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
 
     const q = (s) => document.querySelector(s);
     const READ_KEY = "cf_notif_read_ids";
 
     // Keep the full list of notification IDs currently loaded for this role
     let lastNotificationIds = [];
+
+    // Full-page pagination state
+    let fullPageRows = [];
+    const PAGE_SIZE = 10;
+    let currentPage = 1;
 
     // --- Role helper ---------------------------------------------------------
     function getCurrentRole() {
@@ -101,7 +106,45 @@
     }
 
     // -------------------------------------------------------------------------
-    // MAIN: Load notifications
+    // Common: fetch + role filter
+    // -------------------------------------------------------------------------
+    async function fetchRoleNotifications(limit) {
+        const rawRole = getCurrentRole();
+        const readSet = getReadSet();
+
+        const rows = await fetchJson(
+            `${SUPABASE_URL}/rest/v1/ncr_notifications` +
+            `?select=id,message,created_at,read,link,type,recipient_role` +
+            `&order=created_at.desc&limit=${limit}`
+        );
+
+        let displayRows = [];
+        if (!rawRole) {
+            displayRows = rows;
+        } else {
+            const role = rawRole.toLowerCase();
+            displayRows = rows.filter((n) => {
+                const rRole = (n.recipient_role || "all").toLowerCase();
+                if (rRole === "all") return true;
+                if (role === "admin") return true;
+                if (role.includes("engineer")) {
+                    return ["engineering", "engineer", "all"].includes(rRole);
+                }
+                if (role.includes("quality")) {
+                    return ["quality", "quality_control", "all"].includes(rRole);
+                }
+                return rRole === role;
+            });
+        }
+
+        // Update global IDs for badge
+        lastNotificationIds = displayRows.map((n) => String(n.id));
+
+        return { displayRows, readSet };
+    }
+
+    // -------------------------------------------------------------------------
+    // Dropdown: Load notifications (max 5 displayed)
     // -------------------------------------------------------------------------
     async function loadNotifications() {
         const badge = q("#notifBadge");
@@ -110,56 +153,25 @@
         if (!badge || !list) return;
 
         try {
-            const rawRole = getCurrentRole();
-            const readSet = getReadSet();
-
-            const rows = await fetchJson(
-                `${SUPABASE_URL}/rest/v1/ncr_notifications?select=id,message,created_at,read,link,type,recipient_role&order=created_at.desc&limit=50`
-            );
+            const { displayRows, readSet } = await fetchRoleNotifications(50);
 
             list.innerHTML = "";
-            lastNotificationIds = [];
-
-            // ---- Role filter -----------------------------------------------------
-            let displayRows = [];
-            if (!rawRole) {
-                displayRows = rows;
-            } else {
-                const role = rawRole.toLowerCase();
-                displayRows = rows.filter((n) => {
-                    const rRole = (n.recipient_role || "all").toLowerCase();
-                    if (rRole === "all") return true;
-                    if (role === "admin") return true;
-                    if (role.includes("engineer")) {
-                        return ["engineering", "engineer", "all"].includes(rRole);
-                    }
-                    if (role.includes("quality")) {
-                        return ["quality", "quality_control", "all"].includes(rRole);
-                    }
-                    return rRole === role;
-                });
-            }
-
-            // Track all notification IDs for badge purposes
-            lastNotificationIds = displayRows.map((n) => String(n.id));
 
             if (displayRows.length === 0) {
                 list.innerHTML = `<div class="list-group-item border-0 py-3 text-muted">No notifications for your role.</div>`;
-                lastNotificationIds = [];
                 updateBadgeFromState();
                 return;
             }
 
-            // ---- Compute TOTAL unread across all notifications for this role -----
+            // TOTAL unread across all notifications for this role
             const unreadTotal = displayRows.reduce((acc, n) => {
                 const id = String(n.id);
                 const isRead = n.read || readSet.has(id);
                 return acc + (isRead ? 0 : 1);
             }, 0);
 
-            // ---- Render only the latest 5 in the dropdown ------------------------
-            const maxToShow = 5;
-            const rowsForDropdown = displayRows.slice(0, maxToShow);
+            // Only show latest 5 in dropdown
+            const rowsForDropdown = displayRows.slice(0, 5);
 
             rowsForDropdown.forEach((n) => {
                 const time = fmtTime(n.created_at);
@@ -183,12 +195,12 @@
                 if (n.link) {
                     list.insertAdjacentHTML(
                         "beforeend",
-                        `<a href="${n.link}" class="list-group-item list-group-item-action border-0 py-3" data-id="${id}">${content}</a>`
+                        `<a href="${n.link}" class="list-group-item list-group-item-action border-0 py-3 ${isRead ? "notif-read" : ""}" data-id="${id}">${content}</a>`
                     );
                 } else {
                     list.insertAdjacentHTML(
                         "beforeend",
-                        `<div class="list-group-item border-0 py-3" data-id="${id}">${content}</div>`
+                        `<div class="list-group-item border-0 py-3 ${isRead ? "notif-read" : ""}" data-id="${id}">${content}</div>`
                     );
                 }
             });
@@ -204,7 +216,7 @@
           </div>`
             );
 
-            // Set badge from TOTAL unread (not just the visible 5)
+            // Badge from TOTAL unread
             if (unreadTotal > 0) {
                 badge.textContent = unreadTotal > 9 ? "9+" : unreadTotal.toString();
                 badge.classList.remove("d-none");
@@ -215,7 +227,119 @@
         } catch (error) {
             console.warn("nav-notifications: loadNotifications failed", error);
             list.innerHTML = `<div class="list-group-item text-danger small">Could not load notifications.</div>`;
-            lastNotificationIds = [];
+            updateBadgeFromState();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Full page: render one page
+    // -------------------------------------------------------------------------
+    function renderFullPage(page) {
+        const list = q("#notifPageList");
+        const pager = q("#notifPagination");
+        if (!list || !pager) return;
+
+        const readSet = getReadSet();
+        const total = fullPageRows.length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+        currentPage = Math.min(Math.max(page, 1), totalPages);
+
+        list.innerHTML = "";
+
+        if (total === 0) {
+            list.innerHTML = `
+        <div class="list-group-item border-0 py-4 text-muted text-center">
+          No notifications for your role.
+        </div>`;
+            pager.innerHTML = "";
+            return;
+        }
+
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const end = Math.min(start + PAGE_SIZE, total);
+        const slice = fullPageRows.slice(start, end);
+
+        slice.forEach((n) => {
+            const time = fmtTime(n.created_at);
+            const id = String(n.id);
+            const isRead = n.read || readSet.has(id);
+
+            const newBadge = isRead
+                ? ""
+                : `<span class="badge bg-primary-subtle text-primary small new-badge">New</span>`;
+
+            const content = `
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="fw-semibold ${isRead ? "text-muted" : ""}">${n.message}</div>
+          <div class="ms-2">
+            ${newBadge}
+          </div>
+        </div>
+        <small class="text-muted mt-1">${time}</small>
+      `;
+
+            const baseClass = `list-group-item border-0 py-3 ${isRead ? "notif-read" : ""}`;
+
+            if (n.link) {
+                list.insertAdjacentHTML(
+                    "beforeend",
+                    `<a href="${n.link}" class="${baseClass}" data-id="${id}">${content}</a>`
+                );
+            } else {
+                list.insertAdjacentHTML(
+                    "beforeend",
+                    `<div class="${baseClass}" data-id="${id}">${content}</div>`
+                );
+            }
+        });
+
+        // Build pagination
+        let html = "";
+
+        const disabledPrev = currentPage === 1 ? " disabled" : "";
+        html += `
+      <li class="page-item${disabledPrev}">
+        <a class="page-link notif-page-link" href="#" data-page="${currentPage - 1}">&laquo;</a>
+      </li>`;
+
+        for (let p = 1; p <= totalPages; p++) {
+            const active = p === currentPage ? " active" : "";
+            html += `
+        <li class="page-item${active}">
+          <a class="page-link notif-page-link" href="#" data-page="${p}">${p}</a>
+        </li>`;
+        }
+
+        const disabledNext = currentPage === totalPages ? " disabled" : "";
+        html += `
+      <li class="page-item${disabledNext}">
+        <a class="page-link notif-page-link" href="#" data-page="${currentPage + 1}">&raquo;</a>
+      </li>`;
+
+        pager.innerHTML = html;
+    }
+
+    // -------------------------------------------------------------------------
+    // Full page: load all notifications (for this role) and paginate
+    // -------------------------------------------------------------------------
+    async function loadFullPageNotifications() {
+        const list = q("#notifPageList");
+        const pager = q("#notifPagination");
+        if (!list || !pager) return; // not on notifications.html
+
+        try {
+            const { displayRows } = await fetchRoleNotifications(200); // up to 200 for full page
+            fullPageRows = displayRows;
+            renderFullPage(1);
+            updateBadgeFromState();
+        } catch (err) {
+            console.warn("nav-notifications: loadFullPageNotifications failed", err);
+            list.innerHTML = `
+        <div class="list-group-item border-0 py-4 text-danger text-center small">
+          Could not load notifications.
+        </div>`;
+            pager.innerHTML = "";
             updateBadgeFromState();
         }
     }
@@ -225,7 +349,18 @@
     // -------------------------------------------------------------------------
     document.addEventListener("click", (ev) => {
         const all = ev.target.closest(".mark-all-read-btn");
-        const notifItem = ev.target.closest("#notifList [data-id]");
+        const notifItem = ev.target.closest("#notifList [data-id], #notifPageList [data-id]");
+        const pageLink = ev.target.closest(".notif-page-link");
+
+        // PAGINATION: change page
+        if (pageLink) {
+            ev.preventDefault();
+            const page = parseInt(pageLink.getAttribute("data-page"), 10);
+            if (!isNaN(page)) {
+                renderFullPage(page);
+            }
+            return;
+        }
 
         // MARK ALL AS READ (UI + localStorage, for ALL notifications, not just 5)
         if (all) {
@@ -241,7 +376,7 @@
 
             // Update current dropdown DOM visually
             document
-                .querySelectorAll("#notifList [data-id]")
+                .querySelectorAll("#notifList [data-id], #notifPageList [data-id]")
                 .forEach((el) => {
                     const badgeEl = el.querySelector(".new-badge");
                     if (badgeEl) badgeEl.remove();
@@ -279,7 +414,11 @@
     // Init
     // -------------------------------------------------------------------------
     document.addEventListener("DOMContentLoaded", () => {
+        // Dropdown (bell)
         loadNotifications();
+
+        // Full page (notifications.html)
+        loadFullPageNotifications();
 
         const notifMenu = q("#notifMenu");
         if (notifMenu) {
