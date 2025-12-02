@@ -578,7 +578,40 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       let saved;
 
+      const sb = window.NCR.auth.client;
+      const ENG = "engineering";
+
+      async function shouldSetEngineeringOnUpdate(id) {
+        if (!id) return true;
+        const { data: prev, error } = await sb
+          .from("ncrs")
+          .select("status, current_stage, whose_turn_dept")
+          .eq("id", id)
+          .single();
+        if (error) return true;
+        return (prev?.status !== "open");
+      }
+
+      function applyEngineeringStage(p) {
+        p.current_stage = ENG;
+      }
+
+      if (await shouldSetEngineeringOnUpdate(window.NCR.state.ncrId)) {
+        applyEngineeringStage(payload);
+      }
+
+      let saved;
+
       if (window.NCR.state.ncrId) {
+        // UPDATE existing NCR
+        const { data, error } = await sb
+          .from("ncrs")
+          .update(payload)
+          .eq("id", window.NCR.state.ncrId)
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
         // UPDATE existing NCR
         const { data, error } = await sb
           .from("ncrs")
@@ -623,6 +656,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
+
       const dest = returnTo || `view-ncr.html?${isEdit ? "" : "status=open&"}highlight=${encodeURIComponent(saved.id)}`;
       const okBtn = document.querySelector('#cfSuccessModal .btn.btn-primary');
       okBtn?.addEventListener('click', () => {
@@ -651,6 +685,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     try {
       const url = `${window.NCR.api.BASE_URL}/rest/v1/suppliers?select=id,name&id=eq.${encodeURIComponent(id)}&limit=1`;
       const res = await fetch(url, {
+
+        headers: await authHeaders()
 
         headers: await authHeaders()
       });
@@ -741,9 +777,19 @@ document.addEventListener("DOMContentLoaded", async function () {
       };
 
       const sb = window.NCR.auth.client;
+      const sb = window.NCR.auth.client;
       let saved;
 
+
       if (window.NCR.state.ncrId) {
+        const { data, error } = await sb
+          .from("ncrs")
+          .update(payload)
+          .eq("id", window.NCR.state.ncrId)
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
         const { data, error } = await sb
           .from("ncrs")
           .update(payload)
@@ -760,9 +806,17 @@ document.addEventListener("DOMContentLoaded", async function () {
           .single();
         if (error) throw error;
         saved = data;
+        const { data, error } = await sb
+          .from("ncrs")
+          .insert([payload])
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
         window.NCR.state.ncrId = saved?.id;
         if (saved?.ncr_no && ncrNoEl) ncrNoEl.value = saved.ncr_no;
       }
+
 
 
       if (showAlert) alert(`Draft saved${saved?.ncr_no ? ` (#${saved.ncr_no})` : ""}.`);
