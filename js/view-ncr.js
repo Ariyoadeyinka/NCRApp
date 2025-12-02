@@ -1,25 +1,62 @@
+// js/view-ncr.js (or engineering-ncrs.js)
 (function () {
   const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
-  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+  const SUPABASE_ANON =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+  let currentSession = null;
 
+  async function authHeaders(extra = {}) {
+    if (!currentSession) throw new Error("Not authenticated");
+
+    return {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${currentSession.access_token}`, // ✅ user token
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...extra,
+    };
+  }
+
+  // ---- role helpers (populated by login.js) ----
+  function getRoles() {
+    try {
+      const raw = localStorage.getItem("cf_roles");
+      if (!raw) {
+        const single = (localStorage.getItem("cf_role") || "").toLowerCase();
+        return single ? [single] : [];
+      }
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return [];
+      return arr.map((r) => String(r).toLowerCase());
+    } catch {
+      return [];
+    }
+  }
+  function hasRole(code) {
+    return getRoles().includes(code.toLowerCase());
+  }
   function isAdmin() {
     try {
-      const urlHasAdmin = new URL(location.href).searchParams.get("admin") === "1";
-      const role = (localStorage.getItem("cf_role") || "").toLowerCase();
-      return urlHasAdmin || role === "admin";
-    } catch { return false; }
+      const urlHasAdmin =
+        new URL(location.href).searchParams.get("admin") === "1";
+      return urlHasAdmin || hasRole("admin");
+    } catch {
+      return hasRole("admin");
+    }
   }
-  const urlStatus = new URLSearchParams(location.search).get('status');
-  const statusSelect = document.getElementById('statusFilter') || document.querySelector('select');
 
+  const urlStatus = new URLSearchParams(location.search).get("status");
+  const statusSelect =
+    document.getElementById("statusFilter") || document.querySelector("select");
   if (urlStatus && statusSelect) {
     const v = urlStatus.toLowerCase();
-    const allowed = new Set(['open', 'pending', 'closed']);
-    statusSelect.value = allowed.has(v) ? v : '';
+    const allowed = new Set(["open", "pending", "closed", "sent_back"]);
+    statusSelect.value = allowed.has(v) ? v : "";
   }
 
   const q = (s) => document.querySelector(s);
   const Q = (s) => Array.from(document.querySelectorAll(s));
+
   function fmtDate(d) {
     if (!d) return "";
     const dt = new Date(d);
@@ -27,11 +64,14 @@
     return dt.toISOString().slice(0, 10);
   }
   function titleCase(s) {
-    return (s || "").toString().replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
+    return (s || "")
+      .toString()
+      .replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
   }
   function escIlike(term) {
     return term.replace(/[%_]/g, (m) => "\\" + m);
   }
+
   function withApiKeyInUrl(url) {
     try {
       const u = new URL(url, location.origin);
@@ -44,6 +84,7 @@
       return `${url}${sep}apikey=${encodeURIComponent(SUPABASE_ANON)}`;
     }
   }
+
   async function fetchJson(url, init) {
     const finalUrl = withApiKeyInUrl(url);
     const res = await fetch(finalUrl, {
@@ -51,9 +92,9 @@
         apikey: SUPABASE_ANON,
         Authorization: `Bearer ${SUPABASE_ANON}`,
         Accept: "application/json",
-        ...(init && init.headers ? init.headers : {})
+        ...(init && init.headers ? init.headers : {}),
       },
-      ...(init || {})
+      ...(init || {}),
     });
     if (!res.ok) {
       const msg = await res.text().catch(() => "");
@@ -65,32 +106,65 @@
     return res;
   }
 
+  // ---- helper to create notifications ----
+  async function createNcrNotification({ ncrId, type, recipientRole, message, link }) {
+    if (!ncrId || !type || !recipientRole || !message) return;
+    try {
+      const url = `${SUPABASE_URL}/rest/v1/ncr_notifications`;
+      const finalUrl = withApiKeyInUrl(url);
+      await fetch(finalUrl, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON,
+          Authorization: `Bearer ${SUPABASE_ANON}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ncr_id: Number(ncrId),
+          type,
+          recipient_role: recipientRole,
+          message,
+          link: link || null,
+          read: false,
+        }),
+      });
+    } catch (err) {
+      console.warn("Failed to create NCR notification:", err);
+    }
+  }
+
   function ensureListContainer() {
     let list = document.getElementById("ncrList");
     if (!list) {
       list = document.createElement("div");
       list.id = "ncrList";
-      // 👇 Make this a responsive grid: 1 col on mobile, 2 on md+
       list.className = "row row-cols-1 row-cols-md-2 g-3";
 
-      const filtersRow = document.querySelector(".row.mb-4.g-2") || document.querySelector(".row.g-2");
+      const filtersRow =
+        document.querySelector(".row.mb-4.g-2") ||
+        document.querySelector(".row.g-2");
       if (filtersRow?.parentElement) {
         filtersRow.parentElement.insertBefore(list, filtersRow.nextSibling);
       } else {
-        const main = document.querySelector("main .container, main .container-xxl") || document.body;
+        const main =
+          document.querySelector("main .container, main .container-xxl") ||
+          document.body;
         main.appendChild(list);
       }
     }
-    document.querySelectorAll("#ncrList ~ .card.p-4.mb-4, .card.p-4.mb-4").forEach(el => el.remove());
+    document
+      .querySelectorAll("#ncrList ~ .card.p-4.mb-4, .card.p-4.mb-4")
+      .forEach((el) => el.remove());
     return list;
   }
-
   function ensurePagerContainer() {
     let pager = document.getElementById("ncrPager");
     if (!pager) {
       pager = document.createElement("div");
       pager.id = "ncrPager";
-      pager.className = "d-flex flex-wrap justify-content-between align-items-center mt-3";
+      pager.className =
+        "d-flex flex-wrap justify-content-between align-items-center mt-3";
       const list = ensureListContainer();
       list.parentElement.insertBefore(pager, list.nextSibling);
     }
@@ -105,6 +179,9 @@
     if (s === "closed") {
       return `<span class="badge rounded-pill bg-success bg-opacity-25 text-success fw-semibold me-2 px-3 py-1">CLOSED</span>`;
     }
+    if (s === "sent_back") {
+      return `<span class="badge rounded-pill bg-danger bg-opacity-25 text-danger fw-semibold me-2 px-3 py-1">SENT BACK</span>`;
+    }
     if (s === "pending" || s === "draft") {
       return `<span class="badge rounded-pill bg-warning bg-opacity-25 text-dark fw-semibold me-2 px-3 py-1">DRAFT</span>`;
     }
@@ -112,9 +189,35 @@
   }
 
   function stageLabel(s) {
-    const map = { quality: "Quality", engineering: "Engineering", operations: "Operations", closed: "Closed" };
+    const map = {
+      quality: "Quality",
+      engineering: "Engineering",
+      operations: "Operations",
+      closed: "Closed",
+    };
     return map[(s || "").toLowerCase()] || "";
   }
+
+  // Pill that shows the CURRENT stage
+  function stagePill(stage) {
+    const s = String(stage || "").toLowerCase();
+    const COLORS = {
+      quality: { bg: "#E6F4FF", text: "#173451" },
+      engineering: { bg: "#173451", text: "#FFFFFF" },
+      operations: { bg: "#EFEAFE", text: "#3B2F5C" },
+      closed: { bg: "#E6F4EA", text: "#1E6D3D" },
+    };
+    const { bg, text } = COLORS[s] || { bg: "#EEE", text: "#222" };
+    const label = stageLabel(s).toUpperCase() || "—";
+    return `
+      <span class="badge rounded-pill fw-semibold me-2 px-3 py-1"
+            title="Current Stage"
+            style="background:${bg};color:${text};">
+        ${label}
+      </span>
+    `;
+  }
+
   function computeNextDept(n) {
     const next = (n.next_up_dept || "").toLowerCase();
     if (next) return next;
@@ -124,43 +227,132 @@
     if (cur === "operations") return "closed";
     return "";
   }
-  function nextDeptBadge(n) {
-    const s = String(n.status || "").toLowerCase();
-    const softArchived = (n.archived === true || s === "archived");
-    const isDraft = (s === "pending" || s === "draft");
-    const isClosed = (s === "closed");
-    if (softArchived || isDraft || isClosed) return "";
-
-    const dept = computeNextDept(n);
-    if (!dept || dept === "closed") return "";
-
-    const COLORS = {
-      quality: { bg: "#E6F4FF", text: "#173451" },
-      engineering: { bg: "#173451", text: "#FFFFFF" },
-      operations: { bg: "#EFEAFE", text: "#3B2F5C" }
-    };
-
-    const { bg, text } = COLORS[dept] || { bg: "#EEE", text: "#222" };
-    const label = stageLabel(dept).toUpperCase();
-
-    return `
-      <span class="badge rounded-pill fw-semibold me-2 px-3 py-1" style="background:${bg};color:${text};">
-        NEXT: ${label}
-      </span>
-    `;
-  }
 
   // ---------- render card ----------
   function renderCard(n) {
-    const supplierName = (n.suppliers && n.suppliers.name) ? n.suppliers.name : "";
-    const qtyText = (n.qty_defective ?? "") && (n.qty_supplied ?? "")
-      ? `${n.qty_defective} / ${n.qty_supplied}` : "";
+    const supplierName =
+      n.suppliers && n.suppliers.name ? n.suppliers.name : "";
+    const qtyText =
+      (n.qty_defective ?? "") && (n.qty_supplied ?? "")
+        ? `${n.qty_defective} / ${n.qty_supplied}`
+        : "";
 
     const processText = n.wip ? "WIP" : "Supplier";
-    const s = String(n.status || "").toLowerCase();
-    const isDraft = (s === "pending" || s === "draft");
+    const statusLower = String(n.status || "").toLowerCase();
+    const isDraft = statusLower === "pending" || statusLower === "draft";
 
-    const nextBadge = nextDeptBadge(n);
+    const isSentBack =
+      statusLower === "sent_back" &&
+      String(n.current_stage || "").toLowerCase() === "quality";
+    // role flags
+    const engineerOnly = hasRole("engineering") && !isAdmin();
+    const qualityOnly = hasRole("quality") && !hasRole("engineering") && !isAdmin();
+    const adminUser = isAdmin();
+
+    // engineer actions: only when CURRENT stage is engineering (and not draft)
+    // engineer actions: allow on ENGINEERING and OPERATIONS (and not draft)
+    const currentStage = String(n.current_stage || "").toLowerCase();
+    const isCurrentEngineering = currentStage === "engineering";
+    const isCurrentOperations = currentStage === "operations";
+
+
+    const isClosed = statusLower === "closed";
+
+    let actionsHtml = "";
+    if (engineerOnly && !adminUser) {
+
+      // ENGINEERING stage, not draft & not closed → View + Review + Send Back
+      if (isCurrentEngineering && !isDraft && !isClosed) {
+        actionsHtml += `
+      <button class="btn btn-outline-primary" data-action="view"
+              style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+        <i class="fa fa-eye me-1"></i> View
+      </button>
+      <button class="btn btn-dark" data-action="review">
+        <i class="fa fa-wrench me-1"></i> Review
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" data-action="sendBack">
+        <i class="bi bi-arrow-return-left"></i> Send Back
+      </button>
+    `;
+      }
+
+      // ENGINEERING stage but CLOSED → View + Edit (no Send Back)
+      else if (isCurrentEngineering && isClosed) {
+        actionsHtml += `
+      <button class="btn btn-outline-primary" data-action="view"
+              style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+        <i class="fa fa-eye me-1"></i> View
+      </button>
+      <button class="btn btn-dark" data-action="review">
+        <i class="fa fa-pen me-1"></i> Edit
+      </button>
+    `;
+      }
+
+      // OPERATIONS stage → View + Edit
+      else if (isCurrentOperations && !isDraft) {
+        actionsHtml += `
+      <button class="btn btn-outline-primary" data-action="view"
+              style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+        <i class="fa fa-eye me-1"></i> View
+      </button>
+      <button class="btn btn-dark" data-action="review">
+        <i class="fa fa-pen me-1"></i> Edit
+      </button>
+    `;
+      }
+
+      // Everything else → View only
+      else {
+        actionsHtml += `
+      <button class="btn btn-outline-primary" data-action="view"
+              style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+        <i class="fa fa-eye me-1"></i> View
+      </button>`;
+      }
+
+    } else if (qualityOnly && !adminUser) {
+      if (isDraft || isSentBack) {
+        // quality can continue editing drafts and sent-back NCRs
+        actionsHtml += `
+          <a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
+            <i class="fa fa-play me-1"></i> Continue
+          </a>`;
+      } else {
+        actionsHtml += `
+          <button class="btn btn-outline-primary" data-action="view"
+                  style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+            <i class="fa fa-eye me-1"></i> View
+          </button>
+          <button class="btn btn-outline-dark" data-action="edit">
+            <i class="fa fa-pen me-1"></i> Edit
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" data-action="archive">
+            <i class="bi bi-archive"></i> Archive
+          </button>`;
+      }
+    } else {
+      // admin / others
+      if (isDraft || isSentBack) {
+        actionsHtml += `
+          <a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
+            <i class="fa fa-play me-1"></i> Continue
+          </a>`;
+      } else {
+        actionsHtml += `
+          <button class="btn btn-outline-primary" data-action="view"
+                  style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+            <i class="fa fa-eye me-1"></i> View
+          </button>
+          <button class="btn btn-outline-dark" data-action="edit">
+            <i class="fa fa-pen me-1"></i> Edit
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" data-action="archive">
+            <i class="bi bi-archive"></i> Archive
+          </button>`;
+      }
+    }
 
     return `
 <div class="col">
@@ -174,8 +366,9 @@
         </div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        ${nextBadge}
+        ${stagePill(n.current_stage)}
         ${statusBadge(n.status)}
+        ${isSentBack ? `<span class="badge rounded-pill bg-light text-danger fw-semibold px-3 py-1">Sent back from Engineering</span>` : ""}
       </div>
     </div>
 
@@ -192,18 +385,7 @@
     </div>
 
     <div class="d-flex justify-content-end gap-2 mt-3">
-      ${isDraft
-        ? `<a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
-             <i class="fa fa-play me-1"></i> Continue
-           </a>`
-        : `
-           <button class="btn btn-outline-primary" data-action="view"
-                   style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
-             <i class="fa fa-eye me-1"></i> View
-           </button>
-           <button class="btn btn-outline-dark" data-action="edit"><i class="fa fa-pen me-1"></i> Edit</button>
-         `}
-      <button class="btn btn-outline-secondary btn-sm" data-action="archive"><i class="bi bi-archive"></i> Archive</button>
+      ${actionsHtml}
     </div>
   </div>
 </div>`;
@@ -212,29 +394,57 @@
   async function fetchPageNCRs({ page, pageSize, searchTerm, statusFilter, adminVisible }) {
     const base = `${SUPABASE_URL}/rest/v1/ncrs`;
     const select =
-      "id,ncr_no,status,product_no,so_no,qty_defective,qty_supplied,rep_name,wip,date_raised,date_closed,defect_desc,is_nc,supplier_id,created_at,archived,current_stage,next_up_dept,whose_turn_dept,suppliers(name)";
-    const qs = new URLSearchParams({ select, order: "id.desc", limit: String(pageSize), offset: String((page - 1) * pageSize) });
+      "id,ncr_no,status,product_no,so_no,qty_defective,qty_supplied,rep_name,wip,date_raised,date_closed,defect_desc,is_nc,supplier_id,created_at,updated_at,archived,current_stage,next_up_dept,whose_turn_dept,suppliers(name)";
+    const qs = new URLSearchParams({
+      select,
+      order: "id.desc",
+      limit: String(pageSize),
+      offset: String((page - 1) * pageSize),
+    });
 
     const filters = [];
+    const engineer = hasRole("engineering") && !adminVisible;
+    const quality =
+      hasRole("quality") && !hasRole("engineering") && !adminVisible;
 
     if (!adminVisible) {
       filters.push("archived=is.false");
+
+      if (engineer) {
+        filters.push("or=(current_stage.eq.engineering,current_stage.eq.operations)");
+        filters.push("status=neq.pending");
+        filters.push("status=neq.draft");
+      } else if (quality) {
+
+      }
     }
 
     if (statusFilter) {
-      filters.push(`status=eq.${encodeURIComponent(statusFilter)}`);
+      const statusValues = ["open", "closed", "sent_back", "pending", "draft"];
+
+      const stageValues = ["quality", "engineering", "operations"];
+
+      if (statusValues.includes(statusFilter)) {
+        filters.push(`status=eq.${encodeURIComponent(statusFilter)}`);
+      }
+      else if (stageValues.includes(statusFilter)) {
+        filters.push(`current_stage=eq.${encodeURIComponent(statusFilter)}`);
+      }
     }
+
 
     if (searchTerm) {
       const term = escIlike(searchTerm.trim());
-      filters.push(`or=(ncr_no.ilike.*${term}*,product_no.ilike.*${term}*,so_no.ilike.*${term}*,rep_name.ilike.*${term}*)`);
+      filters.push(
+        `or=(ncr_no.ilike.*${term}*,product_no.ilike.*${term}*,so_no.ilike.*${term}*,rep_name.ilike.*${term}*)`
+      );
     }
 
     for (const f of filters) qs.append("", f);
-    const queryStr = [qs.toString()].concat(filters.map(f => f)).join("&");
+    const queryStr = [qs.toString()].concat(filters.map((f) => f)).join("&");
 
     const res = await fetchJson(`${base}?${queryStr}`, {
-      headers: { Prefer: "count=exact" }
+      headers: { Prefer: "count=exact" },
     });
 
     const rows = await res.json();
@@ -244,24 +454,66 @@
       return m ? parseInt(m[1], 10) : rows.length;
     })();
 
-    const normalized = rows.map(r => ({
+    const normalized = rows.map((r) => ({
       ...r,
-      suppliers: (r.suppliers && typeof r.suppliers === "object")
-        ? r.suppliers
-        : (r.suppliers_name ? { name: r.suppliers_name } : r.suppliers)
+      suppliers:
+        r.suppliers && typeof r.suppliers === "object"
+          ? r.suppliers
+          : r.suppliers_name
+            ? { name: r.suppliers_name }
+            : r.suppliers,
     }));
 
     return { rows: normalized, total };
   }
 
-  async function archiveNcr(id) {
+
+  async function patchNcr(id, payload) {
     const base = `${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`;
-    await fetchJson(base, {
+
+    const finalUrl = withApiKeyInUrl(base);
+    const res = await fetch(finalUrl, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify({ archived: true })
+      headers: await authHeaders({ Prefer: "return=minimal" }),
+      body: JSON.stringify(payload),
     });
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      console.error("NCR PATCH failed:", res.status, msg);
+      throw new Error(`NCR update failed (${res.status}): ${msg}`);
+    }
+  }
+
+
+
+  async function archiveNcr(id) {
+    await patchNcr(id, { archived: true });
     return { mode: "archived_flag" };
+  }
+
+
+
+  async function sendBackToQuality(id, n) {
+    const now = new Date().toISOString();
+
+    await patchNcr(id, {
+      status: "sent_back",
+      current_stage: "quality",
+      engineer_decision: "sent_back",
+      date_closed: null,
+      updated_at: now,
+    });
+
+    await createNcrNotification({
+      ncrId: id,
+      type: "sent_back_to_quality",
+      recipientRole: "quality",
+      message: `NCR ${n.ncr_no || ""} was sent back to Quality by Engineering for rework.`,
+      link: `create-ncr.html?ncrId=${id}&mode=edit`,
+    });
+
+    return n;
   }
 
   function ensureViewModal() {
@@ -398,12 +650,16 @@
     const s = String(n.status || "").toLowerCase();
     const pill = q("#vmStatusPill");
     pill.className = "badge rounded-pill fw-semibold px-3 py-2";
+
     if (n.archived === true || s === "archived") {
       pill.classList.add("bg-secondary", "bg-opacity-25", "text-secondary");
       pill.textContent = "ARCHIVED";
     } else if (s === "closed") {
       pill.classList.add("bg-success", "bg-opacity-25", "text-success");
       pill.textContent = "CLOSED";
+    } else if (s === "sent_back") {
+      pill.classList.add("bg-danger", "bg-opacity-25", "text-danger");
+      pill.textContent = "SENT BACK";
     } else if (s === "pending" || s === "draft") {
       pill.classList.add("bg-warning", "bg-opacity-25", "text-dark");
       pill.textContent = "DRAFT";
@@ -428,40 +684,131 @@
 
     q("#vmWip").textContent = n.wip ? "Yes" : "No";
     q("#vmIsNc").textContent = n.is_nc ? "Yes" : "No";
-    q("#vmQtySupplied").textContent = (n.qty_supplied ?? "") === "" ? "—" : String(n.qty_supplied);
-    q("#vmQtyDefective").textContent = (n.qty_defective ?? "") === "" ? "—" : String(n.qty_defective);
+    q("#vmQtySupplied").textContent =
+      (n.qty_supplied ?? "") === "" ? "—" : String(n.qty_supplied);
+    q("#vmQtyDefective").textContent =
+      (n.qty_defective ?? "") === "" ? "—" : String(n.qty_defective);
     q("#vmDefectDesc").textContent = n.defect_desc || "—";
     q("#vmRepName").textContent = n.rep_name || "—";
 
-    q("#vmAudit").textContent =
-      `Created ${fmtDate(n.created_at)} • Updated ${fmtDate(n.updated_at || n.created_at)}`;
+    q("#vmAudit").textContent = `Created ${fmtDate(
+      n.created_at
+    )} • Updated ${fmtDate(n.updated_at || n.created_at)}`;
 
     const editBtn = q("#vmEdit");
     const arcBtn = q("#vmArchive");
-    editBtn.onclick = () => {
-      const params = new URLSearchParams({ ncrId: String(n.id), mode: "edit", returnTo: "view-ncr.html" });
-      window.location.href = `create-ncr.html?${params.toString()}`;
-    };
-    arcBtn.onclick = async () => {
-      const ok = await showArchiveConfirm(n);
-      if (!ok) return;
-      try {
-        await archiveNcr(n.id);
-        await showArchiveSuccess(n);
-        bootstrap.Modal.getOrCreateInstance(document.getElementById("ncrViewModal")).hide();
-        state.needsReload = true;
-        load();
-      } catch (e) {
-        showArchiveError(e);
+
+    const engineer = hasRole("engineering") && !isAdmin();
+    const nextDept = computeNextDept(n);
+    const isNextOps = nextDept === "operations";
+
+    const currentStage = String(n.current_stage || "").toLowerCase();
+    const isClosed = s === "closed";
+
+
+
+    const statusLower = String(n.status || "").toLowerCase();
+    const isDraft = statusLower === "pending" || statusLower === "draft";
+
+    if (engineer && !isClosed && currentStage === "engineering") {
+      editBtn.textContent = "Review";
+    } else {
+      editBtn.textContent = "Edit";
+    }
+
+    if (engineer) {
+      if (currentStage === "operations") {
+        editBtn.textContent = "Edit";
+      } else {
+        editBtn.textContent = "Review";
       }
-    };
+
+      editBtn.onclick = () => {
+        const params = new URLSearchParams({ id: String(n.id) });
+        window.location.href = `engineering-review.html?${params.toString()}`;
+      };
+    } else {
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => {
+        if (engineer) {
+          const params = new URLSearchParams({ id: String(n.id) });
+          window.location.href = `engineering-review.html?${params.toString()}`;
+        } else {
+          const paramsObj = {
+            ncrId: String(n.id),
+            mode: "edit",
+            returnTo: "view-ncr.html",
+          };
+          const params = new URLSearchParams(paramsObj);
+          window.location.href = `create-ncr.html?${params.toString()}`;
+        }
+      };
+
+    }
+
+    if (engineer) {
+      if (currentStage === "engineering" && !isDraft) {
+        arcBtn.classList.remove("d-none");
+        arcBtn.className = "btn btn-outline-secondary";
+        arcBtn.innerHTML =
+          '<i class="bi bi-arrow-return-left me-1"></i> Send Back';
+
+        arcBtn.onclick = async () => {
+          const ok = await showSendBackConfirm();
+          if (!ok) return;
+          try {
+            await sendBackToQuality(n.id, n);
+            await showSendBackSuccess(n);
+            bootstrap.Modal.getOrCreateInstance(
+              document.getElementById("ncrViewModal")
+            ).hide();
+            state.needsReload = true;
+            load();
+          } catch (e) {
+            console.error("Send back failed from modal:", e);
+            showArchiveError(e);
+          }
+        };
+      } else {
+        arcBtn.classList.add("d-none");
+        arcBtn.onclick = null;
+      }
+    } else {
+      arcBtn.classList.remove("d-none");
+      arcBtn.className = "btn btn-outline-secondary";
+      arcBtn.innerHTML = '<i class="bi bi-archive me-1"></i> Archive';
+
+      if (isNextOps && !isAdmin()) {
+        arcBtn.classList.add("d-none");
+      }
+
+      arcBtn.onclick = async () => {
+        const ok = await showArchiveConfirm(n);
+        if (!ok) return;
+        try {
+          await archiveNcr(n.id);
+          await showArchiveSuccess(n);
+          bootstrap.Modal.getOrCreateInstance(
+            document.getElementById("ncrViewModal")
+          ).hide();
+          state.needsReload = true;
+          load();
+        } catch (e) {
+          showArchiveError(e);
+        }
+      };
+    }
   }
+
+
   function showViewModal(n) {
     ensureViewModal();
     fillViewModal(n);
     bootstrap.Modal.getOrCreateInstance(document.getElementById("ncrViewModal")).show();
   }
-  function ensureArchiveModals() { ensureViewModal(); }
+  function ensureArchiveModals() {
+    ensureViewModal();
+  }
   function showArchiveConfirm() {
     ensureArchiveModals();
     return new Promise((resolve) => {
@@ -470,11 +817,22 @@
       const m = bootstrap.Modal.getOrCreateInstance(el);
       const newYes = yes.cloneNode(true);
       yes.parentNode.replaceChild(newYes, yes);
-      newYes.addEventListener("click", () => { m.hide(); resolve(true); }, { once: true });
-      el.addEventListener("hidden.bs.modal", function onHide() {
-        el.removeEventListener("hidden.bs.modal", onHide);
-        resolve(false);
-      }, { once: true });
+      newYes.addEventListener(
+        "click",
+        () => {
+          m.hide();
+          resolve(true);
+        },
+        { once: true }
+      );
+      el.addEventListener(
+        "hidden.bs.modal",
+        function onHide() {
+          el.removeEventListener("hidden.bs.modal", onHide);
+          resolve(false);
+        },
+        { once: true }
+      );
       m.show();
     });
   }
@@ -485,14 +843,100 @@
   }
   function showArchiveError(err) {
     ensureArchiveModals();
-    q("#cfArchiveErrorBody").textContent = `Could not archive NCR. ${(err && err.message) ? err.message : ""}`;
+    q("#cfArchiveErrorBody").textContent = `Could not archive NCR. ${err && err.message ? err.message : ""}`;
     bootstrap.Modal.getOrCreateInstance(document.getElementById("cfArchiveError")).show();
+  }
+
+  function ensureSendBackModals() {
+    if (document.getElementById("cfSendBackConfirm")) return;
+
+    const confirm = document.createElement("div");
+    confirm.className = "modal fade cf-mini-modal";
+    confirm.id = "cfSendBackConfirm";
+    confirm.tabIndex = -1;
+    confirm.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h6 class="modal-title"><i class="bi bi-arrow-return-left me-2"></i>Send NCR Back to Quality?</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0">
+              This will move the NCR out of Engineering and back to Quality as a draft for rework.
+              Are you sure you want to continue?
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-secondary" id="cfSendBackConfirmYes">Send Back</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(confirm);
+
+    const success = document.createElement("div");
+    success.className = "modal fade cf-mini-modal";
+    success.id = "cfSendBackSuccess";
+    success.tabIndex = -1;
+    success.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h6 class="modal-title"><i class="bi bi-check-circle me-2"></i>Sent Back to Quality</h6>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0" id="cfSendBackSuccessBody">
+              NCR was sent back to Quality.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(success);
+  }
+
+  function showSendBackConfirm() {
+    ensureSendBackModals();
+    return new Promise((resolve) => {
+      const el = document.getElementById("cfSendBackConfirm");
+      const yes = document.getElementById("cfSendBackConfirmYes");
+      const m = bootstrap.Modal.getOrCreateInstance(el);
+      const newYes = yes.cloneNode(true);
+      yes.parentNode.replaceChild(newYes, yes);
+      newYes.addEventListener(
+        "click",
+        () => {
+          m.hide();
+          resolve(true);
+        },
+        { once: true }
+      );
+      el.addEventListener(
+        "hidden.bs.modal",
+        function onHide() {
+          el.removeEventListener("hidden.bs.modal", onHide);
+          resolve(false);
+        },
+        { once: true }
+      );
+      m.show();
+    });
+  }
+
+  function showSendBackSuccess(n) {
+    ensureSendBackModals();
+    const body = document.getElementById("cfSendBackSuccessBody");
+    body.textContent = `NCR ${n.ncr_no || ""} was sent back to Quality.`;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("cfSendBackSuccess")).show();
   }
 
   function renderPager({ total, page, pageSize }) {
     const pager = ensurePagerContainer();
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
     if (page > totalPages) page = totalPages;
 
     const maxBtns = 5;
@@ -511,7 +955,7 @@
 
     pager.innerHTML = `
       <div class="text-muted small mb-2 mb-md-0">
-        Showing <strong>${total ? ((page - 1) * pageSize + 1) : 0}-${Math.min(page * pageSize, total)}</strong>
+        Showing <strong>${total ? (page - 1) * pageSize + 1 : 0}-${Math.min(page * pageSize, total)}</strong>
         of <strong>${total}</strong>
       </div>
 
@@ -519,7 +963,9 @@
         <div class="input-group input-group-sm" style="width: 140px;">
           <label class="input-group-text" for="pageSizeSel">Rows</label>
           <select id="pageSizeSel" class="form-select">
-            ${[5, 10, 20, 50].map(n => `<option value="${n}" ${n === pageSize ? "selected" : ""}>${n}</option>`).join("")}
+            ${[5, 10, 20, 50].map(
+      (n) => `<option value="${n}" ${n === pageSize ? "selected" : ""}>${n}</option>`
+    ).join("")}
           </select>
         </div>
 
@@ -536,7 +982,7 @@
         </nav>
       </div>
     `;
-    pager.querySelectorAll("a.page-link[data-page]").forEach(a => {
+    pager.querySelectorAll("a.page-link[data-page]").forEach((a) => {
       a.addEventListener("click", (e) => {
         e.preventDefault();
         const target = parseInt(a.getAttribute("data-page"), 10);
@@ -559,15 +1005,19 @@
     pageSize: 10,
     total: 0,
     rows: [],
-    needsReload: false
+    needsReload: false,
   };
 
   async function load() {
     const listEl = ensureListContainer();
     const pager = ensurePagerContainer();
 
-    const searchInput = document.querySelector(".row.mb-4.g-2 input[type='text']") || document.querySelector("input[type='text']");
-    const statusSelect = document.querySelector(".row.mb-4.g-2 select, #statusFilter") || document.querySelector("select");
+    const searchInput =
+      document.querySelector(".row.mb-4.g-2 input[type='text']") ||
+      document.querySelector("input[type='text']");
+    const statusSelect =
+      document.querySelector(".row.mb-4.g-2 select, #statusFilter") ||
+      document.querySelector("select");
     const searchTerm = (searchInput?.value || "").trim();
     let statusFilter = (statusSelect?.value || "").toLowerCase();
     if (statusFilter === "all status" || statusFilter === "") statusFilter = "";
@@ -579,19 +1029,21 @@
         pageSize: state.pageSize,
         searchTerm,
         statusFilter,
-        adminVisible: isAdmin()
+        adminVisible: isAdmin(),
       });
       state.rows = rows;
       state.total = total;
 
-      listEl.innerHTML = rows.map(renderCard).join("") || `<div class="text-muted">No NCRs found.</div>`;
+      listEl.innerHTML =
+        rows.map(renderCard).join("") ||
+        `<div class="text-muted">No NCRs found.</div>`;
       renderPager({ total, page: state.page, pageSize: state.pageSize });
     } catch (err) {
       console.error(err);
       listEl.innerHTML = `
         <div class="alert alert-warning" role="alert">
           <div class="fw-semibold mb-1">Couldn’t load NCRs.</div>
-          <div class="small text-muted"><code>${(err && err.message) ? err.message : String(err)}</code></div>
+          <div class="small text-muted"><code>${err && err.message ? err.message : String(err)}</code></div>
           <div class="small">Check your PostgREST policies and columns (e.g., <code>archived</code> boolean). </div>
         </div>
       `;
@@ -600,15 +1052,36 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
+    // Require login before showing anything
+    if (!window.NCR || !window.NCR.auth || !window.NCR.auth.requireLogin) {
+      console.error("Auth module not loaded, redirecting to login.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    const session = await window.NCR.auth.requireLogin();
+    if (!session) return;
+    currentSession = session;
     ensureListContainer();
     ensureViewModal();
     ensurePagerContainer();
+    ensureSendBackModals();
 
-    const searchInput = document.querySelector(".row.mb-4.g-2 input[type='text']") || document.querySelector("input[type='text']");
-    const statusSelect = document.querySelector(".row.mb-4.g-2 select, #statusFilter") || document.querySelector("select");
+    const searchInput =
+      document.querySelector(".row.mb-4.g-2 input[type='text']") ||
+      document.querySelector("input[type='text']");
+    const statusSelect =
+      document.querySelector(".row.mb-4.g-2 select, #statusFilter") ||
+      document.querySelector("select");
 
-    searchInput?.addEventListener("input", () => { state.page = 1; load(); });
-    statusSelect?.addEventListener("change", () => { state.page = 1; load(); });
+    searchInput?.addEventListener("input", () => {
+      state.page = 1;
+      load();
+    });
+    statusSelect?.addEventListener("change", () => {
+      state.page = 1;
+      load();
+    });
 
     const listEl = ensureListContainer();
     listEl.addEventListener("click", async (e) => {
@@ -619,7 +1092,7 @@
       const action = btn.getAttribute("data-action");
       if (!id) return;
 
-      const n = state.rows.find(r => String(r.id) === String(id));
+      const n = state.rows.find((r) => String(r.id) === String(id));
 
       if (action === "archive") {
         if (!n) return;
@@ -628,13 +1101,30 @@
         try {
           await archiveNcr(id);
           await showArchiveSuccess(n);
-
           const remaining = state.total - 1;
           const totalPagesAfter = Math.max(1, Math.ceil(remaining / state.pageSize));
           if (state.page > totalPagesAfter) state.page = totalPagesAfter;
           load();
         } catch (err) {
           showArchiveError(err);
+        }
+        return;
+      }
+
+      if (action === "sendBack") {
+        if (!n) return;
+        const ok = await showSendBackConfirm();
+        if (!ok) return;
+        try {
+          await sendBackToQuality(id, n);
+          await showSendBackSuccess(n);
+          const remaining = state.total - 1;
+          const totalPagesAfter = Math.max(1, Math.ceil(remaining / state.pageSize));
+          if (state.page > totalPagesAfter) state.page = totalPagesAfter;
+          load();
+        } catch (err) {
+          console.error("Send back failed:", err);
+          alert("Could not send NCR back to Quality.");
         }
         return;
       }
@@ -646,13 +1136,27 @@
       }
 
       if (action === "edit") {
-        const params = new URLSearchParams({ ncrId: String(id), mode: "edit", returnTo: "view-ncr.html" });
+        const params = new URLSearchParams({
+          ncrId: String(id),
+          mode: "edit",
+          returnTo: "view-ncr.html",
+        });
         window.location.href = `create-ncr.html?${params.toString()}`;
         return;
       }
 
+      if (action === "review") {
+        const params = new URLSearchParams({ id: String(id) });
+        window.location.href = `engineering-review.html?${params.toString()}`;
+        return;
+      }
+
       if (action === "continue") {
-        const params = new URLSearchParams({ ncrId: String(id), mode: "edit", returnTo: "view-ncr.html" });
+        const params = new URLSearchParams({
+          ncrId: String(id),
+          mode: "edit",
+          returnTo: "view-ncr.html",
+        });
         window.location.href = `create-ncr.html?${params.toString()}`;
         return;
       }

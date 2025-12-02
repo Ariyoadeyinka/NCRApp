@@ -1,7 +1,88 @@
-// js/create-ncr.js
 document.addEventListener("DOMContentLoaded", async function () {
-  // state holder for current draft id
+
+  const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
+  const SUPABASE_ANON =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+
+  async function notifAuthHeaders() {
+    try {
+      if (window.NCR?.auth?.client) {
+        const {
+          data: { session },
+        } = await window.NCR.auth.client.auth.getSession();
+
+        if (session && session.access_token) {
+          return {
+            apikey: SUPABASE_ANON,
+            Authorization: `Bearer ${session.access_token}`,
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("notif: failed to get auth session, using anon", e);
+    }
+
+    return {
+      apikey: SUPABASE_ANON,
+      Authorization: `Bearer ${SUPABASE_ANON}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    };
+  }
+
+  async function createNotificationRow(payload) {
+    const headers = await notifAuthHeaders();
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/ncr_notifications`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.warn("failed to create notification", res.status, await res.text());
+    }
+  }
+
+  await (window.NCR.auth?.requireLogin?.());
   window.NCR = window.NCR || {};
+  await window.NCR.auth?.requireLogin?.();
+
+  async function authHeaders() {
+    if (!window.NCR?.auth?.client) throw new Error("Auth client missing");
+    const { data: { session } } = await window.NCR.auth.client.auth.getSession();
+    if (!session) throw new Error("Not authenticated");
+    return {
+      apikey: window.NCR.api?.ANON_KEY,
+      Authorization: `Bearer ${session.access_token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    };
+  }
+
+  window.NCR.api = window.NCR.api || {};
+  if (!window.NCR.api.getOrCreateSupplierId) {
+    window.NCR.api.getOrCreateSupplierId = async function (nameOrId) {
+      const n = Number(nameOrId);
+      if (Number.isFinite(n)) return n;
+      const sb = window.NCR.auth.client;
+      const { data: rid, error: rpcErr } = await sb.rpc("get_or_create_supplier_id", { p_name: String(nameOrId) });
+      if (!rpcErr) return rid;
+
+      const { error: upErr } = await sb.from("suppliers")
+        .upsert({ name: String(nameOrId) }, { onConflict: "name", ignoreDuplicates: false });
+      if (upErr) throw upErr;
+
+      const { data, error } = await sb.from("suppliers")
+        .select("id").eq("name", String(nameOrId)).limit(1).maybeSingle();
+      if (error || !data) throw error || new Error("Supplier not found/created");
+      return data.id;
+    };
+  }
+
   window.NCR.state = window.NCR.state || {};
 
   const getQuery = (k) => new URL(location.href).searchParams.get(k);
@@ -85,18 +166,10 @@ document.addEventListener("DOMContentLoaded", async function () {
     return Number.isFinite(n) ? n : null;
   }
 
-  // Business rules:
-  // - qty_defective <= qty_supplied
-  // - numbers >= 0
-  // - defectDesc length >= 20 chars (when provided / required on step2 & submit)
-  // - productNo required (>0 length)
-  // - repName required (>=3 chars)
-  // - supplier required on submit (id or new name)
-  // - closed date (if present) >= date_raised
-  function validateBusinessRules(context /* 'step1' | 'step2' | 'submit' */) {
+
+  function validateBusinessRules(context) {
     let ok = true;
 
-    // Step 1 checks
     if (context === 'step1' || context === 'submit') {
       const productNo = byName('productNo');
       if (!productNo?.value?.trim()) {
@@ -112,7 +185,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         clearFieldError(dateRaised);
       }
 
-      // closed date cannot be earlier than raised (if present and not 'N/A')
       const dateClosed = byName('dateClosed');
       const dr = dateRaised?.value ? new Date(dateRaised.value) : null;
       const dcVal = dateClosed?.value?.trim();
@@ -128,7 +200,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
 
-    // Step 2 checks
     if (context === 'step2' || context === 'submit') {
       const qtySuppliedEl = byName('qtySupplied');
       const qtyDefectiveEl = byName('qtyDefective');
@@ -138,7 +209,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       const qs = parseIntOrNull(qtySuppliedEl?.value);
       const qd = parseIntOrNull(qtyDefectiveEl?.value);
 
-      // numbers must be >= 0
       if (qs === null || qs < 0) {
         ok = showFieldError(qtySuppliedEl, "Quantity supplied must be 0 or greater.") && ok;
       } else {
@@ -150,12 +220,10 @@ document.addEventListener("DOMContentLoaded", async function () {
         clearFieldError(qtyDefectiveEl);
       }
 
-      // qd <= qs
       if (qs !== null && qd !== null && qd > qs) {
         ok = showFieldError(qtyDefectiveEl, "Defective quantity cannot exceed supplied quantity.") && ok;
       }
 
-      // description length >= 20
       const desc = defectDescEl?.value?.trim() || "";
       if (desc.length < 20) {
         ok = showFieldError(defectDescEl, "Please provide at least 20 characters.") && ok;
@@ -163,7 +231,6 @@ document.addEventListener("DOMContentLoaded", async function () {
         clearFieldError(defectDescEl);
       }
 
-      // rep required, min 3 chars
       const rep = repNameEl?.value?.trim() || "";
       if (rep.length < 3) {
         ok = showFieldError(repNameEl, "Please enter the Quality Rep’s name (min 3 characters).") && ok;
@@ -172,9 +239,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
 
-    // Submit-only checks
     if (context === 'submit') {
-      // supplier must be resolvable
       const supplierSelect = document.getElementById("supplier");
       const newName = document.getElementById("newSupplierName")?.value?.trim();
       const val = supplierSelect?.value;
@@ -188,7 +253,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     }
 
-    // focus first invalid field
     if (!ok) {
       const first = document.querySelector(".is-invalid");
       first?.focus();
@@ -237,21 +301,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   const supplierSelectEl = document.getElementById("supplier");
   supplierSelectEl?.addEventListener("change", async () => {
     const val = supplierSelectEl.value;
-
-    const parsed = Number(val);
-    if (val && val !== "add_new" && Number.isFinite(parsed)) {
-      await trySaveDraft(false);
-      return;
-    }
-
     if (val && val !== "add_new") {
-      const id = await window.NCR.api.getOrCreateSupplierId(val.trim());
-      supplierSelectEl.options[supplierSelectEl.selectedIndex].value = String(id);
       await trySaveDraft(false);
-      return;
     }
-
   });
+
 
   document.getElementById("addSupplierBtn")?.addEventListener("click", async () => {
     const input = document.getElementById("newSupplierName");
@@ -287,7 +341,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   });
 
-  // Extra live checks for numeric & description fields
   const qtySuppliedEl = byName('qtySupplied');
   const qtyDefectiveEl = byName('qtyDefective');
   const defectDescEl = byName('defectDesc');
@@ -298,7 +351,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       showFieldError(qtySuppliedEl, "Quantity supplied must be 0 or greater.");
     } else {
       clearFieldError(qtySuppliedEl);
-      // also recheck the relation when supplied changes
       const qd = parseIntOrNull(qtyDefectiveEl?.value);
       if (qd !== null && qd > qs) {
         showFieldError(qtyDefectiveEl, "Defective quantity cannot exceed supplied quantity.");
@@ -502,13 +554,66 @@ document.addEventListener("DOMContentLoaded", async function () {
         rep_name: formVals.repName,
         status: "open"
       };
+      const sb = window.NCR.auth.client;
+      const ENG = "engineering";
 
-      var saved;
-      if (window.NCR.state.ncrId) {
-        saved = await window.NCR.api.updateNcr(window.NCR.state.ncrId, payload);
-      } else {
-        saved = await window.NCR.api.insertNcr(payload);
+      async function shouldSetEngineeringOnUpdate(id) {
+        if (!id) return true;
+        const { data: prev, error } = await sb
+          .from("ncrs")
+          .select("status, current_stage, whose_turn_dept")
+          .eq("id", id)
+          .single();
+        if (error) return true;
+        return (prev?.status !== "open");
       }
+
+      function applyEngineeringStage(p) {
+        p.current_stage = ENG;
+      }
+
+      if (await shouldSetEngineeringOnUpdate(window.NCR.state.ncrId)) {
+        applyEngineeringStage(payload);
+      }
+
+      let saved;
+
+      if (window.NCR.state.ncrId) {
+        // UPDATE existing NCR
+        const { data, error } = await sb
+          .from("ncrs")
+          .update(payload)
+          .eq("id", window.NCR.state.ncrId)
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
+      } else {
+        // INSERT new NCR
+        const { data, error } = await sb
+          .from("ncrs")
+          .insert([payload])
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
+        window.NCR.state.ncrId = saved?.id;
+      }
+
+      try {
+        if (!isEdit) {
+          await createNotificationRow({
+            ncr_id: saved.id,
+            message: `New NCR #${saved.ncr_no} was created by Quality and is awaiting Engineering review.`,
+            recipient_role: "engineering",
+            type: "ncr_created",
+            link: `engineering-review.html?ncrId=${encodeURIComponent(saved.id)}`
+          });
+        }
+      } catch (e) {
+        console.warn("failed to create engineering notification", e);
+      }
+
 
       showSuccessModal(
         isEdit ? "NCR Updated" : "NCR Created",
@@ -516,6 +621,7 @@ document.addEventListener("DOMContentLoaded", async function () {
           ? `NCR #${saved.ncr_no} was updated successfully.`
           : `NCR #${saved.ncr_no} was created successfully.`
       );
+
 
       const dest = returnTo || `view-ncr.html?${isEdit ? "" : "status=open&"}highlight=${encodeURIComponent(saved.id)}`;
       const okBtn = document.querySelector('#cfSuccessModal .btn.btn-primary');
@@ -545,11 +651,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     try {
       const url = `${window.NCR.api.BASE_URL}/rest/v1/suppliers?select=id,name&id=eq.${encodeURIComponent(id)}&limit=1`;
       const res = await fetch(url, {
-        headers: {
-          apikey: window.NCR.api.ANON_KEY,
-          Authorization: `Bearer ${window.NCR.api.ANON_KEY}`,
-          Accept: "application/json"
-        }
+
+        headers: await authHeaders()
       });
       if (!res.ok) return;
       const rows = await res.json();
@@ -637,15 +740,30 @@ document.addEventListener("DOMContentLoaded", async function () {
         status: "pending"
       };
 
+      const sb = window.NCR.auth.client;
       let saved;
+
       if (window.NCR.state.ncrId) {
-        saved = await window.NCR.api.updateNcr(window.NCR.state.ncrId, payload);
+        const { data, error } = await sb
+          .from("ncrs")
+          .update(payload)
+          .eq("id", window.NCR.state.ncrId)
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
       } else {
-        const saver = window.NCR.api.saveDraft || window.NCR.api.insertNcr;
-        saved = await saver(payload);
+        const { data, error } = await sb
+          .from("ncrs")
+          .insert([payload])
+          .select()
+          .single();
+        if (error) throw error;
+        saved = data;
         window.NCR.state.ncrId = saved?.id;
         if (saved?.ncr_no && ncrNoEl) ncrNoEl.value = saved.ncr_no;
       }
+
 
       if (showAlert) alert(`Draft saved${saved?.ncr_no ? ` (#${saved.ncr_no})` : ""}.`);
     } catch (err) {

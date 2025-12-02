@@ -195,7 +195,7 @@ body {
 
 .ncr-subtitle {
     display: block;
-    font-size: 13px;
+    font-size: 18px;
     font-weight: 400;
     color: #666
 }
@@ -258,12 +258,16 @@ body {
 }
 
 .open {
-    color: #d9534f
+    color: #d9534f;
 }
 
 .ncr-status.open {
-    background: #d9534f;
-    color: #fff
+    background: #fff;
+    border: 2px solid #D32F2F;
+    color: #D32F2F;
+    padding: 6px 14px;
+    font-weight: 600;
+    border-radius: 6px;
 }
 
 .closed {
@@ -271,8 +275,12 @@ body {
 }
 
 .ncr-status.closed {
-    background: #28a745;
-    color: #fff
+    background: #fff;
+    border: 2px solid #28a745;
+    color: #28a745;
+    padding: 6px 14px;
+    font-weight: 600;
+    border-radius: 6px;
 }
 
 .pending {
@@ -280,8 +288,12 @@ body {
 }
 
 .ncr-status.pending {
-    background: #f0ad4e;
-    color: #fff
+    background: #fff;
+    border: 2px solid #F9A825;
+    color: #F9A825;
+    padding: 6px 14px;
+    font-weight: 600;
+    border-radius: 6px;
 }
 
 .app-footer {
@@ -816,6 +828,7 @@ main {
 footer.app-footer {
     margin-top: auto;
 }
+
 input.form-control.disabled-form[readonly],
 input.form-control.disabled-form:disabled {
     background-color: #e0e0e0 !important;
@@ -823,18 +836,20 @@ input.form-control.disabled-form:disabled {
     border: none;
     opacity: 1 !important;
 }
-.create-new-ncr{
-    background-color:  #f8f9fa;
+
+.create-new-ncr {
+    background-color: #f8f9fa;
     color: #173451;
     border: 1.5px solid #173451;
 }
 
-.create-new-ncr:hover{
+.create-new-ncr:hover {
     background-color: #173451;
     color: white;
 }
 
-
-
-
-
+.notif-read {   
+    opacity: 0.8;               /* soft grey look */
+    color: #6c757d !important;      /* bootstrap muted color */
+    transition: all 0.2s ease;
+}

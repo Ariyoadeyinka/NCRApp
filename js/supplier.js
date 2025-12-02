@@ -8,7 +8,7 @@
         selectEl.appendChild(placeholder);
         (suppliers || []).forEach(s => {
             const opt = document.createElement("option");
-            opt.value = s.name; 
+            opt.value = s.name;
             opt.textContent = s.name;
             selectEl.appendChild(opt);
         });
