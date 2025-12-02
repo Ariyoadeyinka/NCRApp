@@ -51,6 +51,12 @@ document.addEventListener("DOMContentLoaded", async function () {
   window.NCR = window.NCR || {};
   await window.NCR.auth?.requireLogin?.();
 
+  // After login, load current user + prefill rep name
+  await initCurrentUserAndRepName();
+
+  const currentUser = await loadCurrentUserProfileAndRoles();
+  prefillRepNameFromCurrentUser(currentUser);
+
   async function authHeaders() {
     if (!window.NCR?.auth?.client) throw new Error("Auth client missing");
     const { data: { session } } = await window.NCR.auth.client.auth.getSession();
@@ -113,6 +119,156 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   }
 
+  // ---- Current user / role helpers ----
+  async function loadCurrentUserProfileAndRoles() {
+    if (!window.NCR?.auth?.client) return null;
+    const sb = window.NCR.auth.client;
+
+    // 1) Get auth user (id, email)
+    const { data: { user }, error: userErr } = await sb.auth.getUser();
+    if (userErr || !user) {
+      console.warn("Failed to get current user", userErr);
+      return null;
+    }
+
+    // 2) Get profile (full_name)
+    const { data: profile, error: profErr } = await sb
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profErr) {
+      console.warn("Failed to load profile", profErr);
+    }
+
+    // 3) Get roles (could be multiple, but we'll just pick the first as primary)
+    const { data: roleRows, error: roleErr } = await sb
+      .from("profile_roles")
+      .select("roles(code)")
+      .eq("profile_id", user.id);
+
+    if (roleErr) {
+      console.warn("Failed to load roles", roleErr);
+    }
+
+    const roles = (roleRows || [])
+      .map(r => r.roles?.code)
+      .filter(Boolean);
+
+    const primaryRole = roles[0] || null;
+
+    const fullName =
+      profile?.full_name
+      || (user.email ? user.email.split("@")[0] : "User");
+
+    const info = {
+      id: user.id,
+      email: user.email,
+      fullName,
+      roles,
+      primaryRole
+    };
+
+    window.NCR.state = window.NCR.state || {};
+    window.NCR.state.currentUser = info;
+
+    return info;
+  }
+
+  function prefillRepNameFromCurrentUser(currentUser) {
+    const repInput = byName("repName");
+    if (!repInput || !currentUser) return;
+
+    // Don't overwrite if there's already a value (e.g., editing an existing NCR)
+    if (repInput.value && repInput.value.trim().length > 0) return;
+
+    let name = currentUser.fullName || "";
+    if (!name) return;
+
+    // If the user is an engineer, prefix with "Engineer:"
+    if (currentUser.primaryRole === "engineering") {
+      name = `Engineer: ${name}`;
+    }
+
+    repInput.value = name;
+  }
+  // ---- Current user + repName autofill ----
+  async function initCurrentUserAndRepName() {
+    if (!window.NCR?.auth?.client) return;
+    const sb = window.NCR.auth.client;
+
+    // 1) Get the authenticated user from Supabase Auth
+    const { data: { session }, error: sessErr } = await sb.auth.getSession();
+    if (sessErr || !session?.user) {
+      console.warn("No session user", sessErr);
+      return;
+    }
+    const user = session.user;
+
+    // 2) Start with name from user_metadata or email prefix
+    let fullName =
+      (user.user_metadata && user.user_metadata.full_name) ||
+      (user.email ? user.email.split("@")[0] : "");
+
+    let primaryRole = null;
+
+    // 3) Try to get full_name from profiles (if RLS allows)
+    try {
+      const { data: profile, error: profErr } = await sb
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profErr && profile?.full_name) {
+        fullName = profile.full_name;
+      }
+    } catch (e) {
+      console.warn("Failed to load profile", e);
+    }
+
+    // 4) Try to get roles (if RLS allows)
+    try {
+      const { data: roleRows, error: roleErr } = await sb
+        .from("profile_roles")
+        .select("roles(code)")
+        .eq("profile_id", user.id);
+
+      if (!roleErr && roleRows) {
+        const codes = roleRows
+          .map(r => r.roles?.code)
+          .filter(Boolean);
+        primaryRole = codes[0] || null;
+      }
+    } catch (e) {
+      console.warn("Failed to load roles", e);
+    }
+
+    // 5) Fallback name if still empty
+    if (!fullName && user.email) {
+      fullName = user.email.split("@")[0];
+    }
+
+    const repInput = byName("repName");
+    if (!repInput) return;
+
+    // Don't override on edit if there's already a value loaded from DB
+    if (repInput.value && repInput.value.trim().length > 0) return;
+
+    if (!fullName) return;
+
+    let displayName = fullName;
+    if (primaryRole === "engineering") {
+      displayName = `Engineer: ${fullName}`;
+    }
+
+    repInput.value = displayName;
+    // Make it not editable but still submitted with the form
+    repInput.readOnly = true;
+    // Optional: make it look visually read-only
+    repInput.classList.add("bg-light");
+  }
 
 
   const mode = new URL(location.href).searchParams.get("mode");
@@ -578,40 +734,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       let saved;
 
-      const sb = window.NCR.auth.client;
-      const ENG = "engineering";
-
-      async function shouldSetEngineeringOnUpdate(id) {
-        if (!id) return true;
-        const { data: prev, error } = await sb
-          .from("ncrs")
-          .select("status, current_stage, whose_turn_dept")
-          .eq("id", id)
-          .single();
-        if (error) return true;
-        return (prev?.status !== "open");
-      }
-
-      function applyEngineeringStage(p) {
-        p.current_stage = ENG;
-      }
-
-      if (await shouldSetEngineeringOnUpdate(window.NCR.state.ncrId)) {
-        applyEngineeringStage(payload);
-      }
-
-      let saved;
-
       if (window.NCR.state.ncrId) {
-        // UPDATE existing NCR
-        const { data, error } = await sb
-          .from("ncrs")
-          .update(payload)
-          .eq("id", window.NCR.state.ncrId)
-          .select()
-          .single();
-        if (error) throw error;
-        saved = data;
         // UPDATE existing NCR
         const { data, error } = await sb
           .from("ncrs")
@@ -656,7 +779,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       );
 
 
-
       const dest = returnTo || `view-ncr.html?${isEdit ? "" : "status=open&"}highlight=${encodeURIComponent(saved.id)}`;
       const okBtn = document.querySelector('#cfSuccessModal .btn.btn-primary');
       okBtn?.addEventListener('click', () => {
@@ -685,8 +807,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     try {
       const url = `${window.NCR.api.BASE_URL}/rest/v1/suppliers?select=id,name&id=eq.${encodeURIComponent(id)}&limit=1`;
       const res = await fetch(url, {
-
-        headers: await authHeaders()
 
         headers: await authHeaders()
       });
@@ -777,19 +897,9 @@ document.addEventListener("DOMContentLoaded", async function () {
       };
 
       const sb = window.NCR.auth.client;
-      const sb = window.NCR.auth.client;
       let saved;
 
-
       if (window.NCR.state.ncrId) {
-        const { data, error } = await sb
-          .from("ncrs")
-          .update(payload)
-          .eq("id", window.NCR.state.ncrId)
-          .select()
-          .single();
-        if (error) throw error;
-        saved = data;
         const { data, error } = await sb
           .from("ncrs")
           .update(payload)
@@ -806,17 +916,9 @@ document.addEventListener("DOMContentLoaded", async function () {
           .single();
         if (error) throw error;
         saved = data;
-        const { data, error } = await sb
-          .from("ncrs")
-          .insert([payload])
-          .select()
-          .single();
-        if (error) throw error;
-        saved = data;
         window.NCR.state.ncrId = saved?.id;
         if (saved?.ncr_no && ncrNoEl) ncrNoEl.value = saved.ncr_no;
       }
-
 
 
       if (showAlert) alert(`Draft saved${saved?.ncr_no ? ` (#${saved.ncr_no})` : ""}.`);
