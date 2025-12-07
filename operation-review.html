@@ -121,14 +121,13 @@
         <!-- Breadcrumb -->
         <div class="small text-muted mb-2">
             <i class="bi bi-house-door me-1"></i>
-            <a href="operations-dashboard.html" class="text-muted text-decoration-none">Dashboard</a>
+            <a href="dashboard.html" class="text-muted text-decoration-none">Dashboard</a>
             <span class="mx-2">›</span>
-            <a href="operations-ncrs.html" class="text-muted text-decoration-none">NCR List</a>
+            <a href="view-ncr.html" class="text-muted text-decoration-none">NCR List</a>
             <span class="mx-2">›</span>
             <strong class="text-dark">Operations Review</strong>
         </div>
 
-        <!-- Steps (reuse eng-step styles) -->
         <div class="d-flex align-items-center gap-3 mb-3 eng-steps">
             <div class="eng-step eng-step-active" id="opsStepLabelForm">
                 <span class="eng-step-dot"><i class="fa-solid fa-clipboard-check"></i></span>
@@ -141,7 +140,6 @@
             </div>
         </div>
 
-        <!-- QUALITY SUMMARY (accordion style – same as engineering page) -->
         <details class="card border-0 shadow-sm mb-3 q-summary" open>
             <summary class="q-summary-head d-flex align-items-center justify-content-between">
                 <div class="d-flex align-items-center gap-2">
@@ -457,13 +455,13 @@
 
                 <div class="card-footer bg-white d-flex flex-column flex-md-row gap-2 justify-content-between">
                     <div class="d-flex gap-2">
-                        <a href="operations-ncrs.html" class="btn btn-outline-secondary">
+                        <a href="view-ncr.html" class="btn btn-outline-secondary">
                             <i class="fa-solid fa-arrow-left-long me-1"></i> Back
                         </a>
                         <button type="button" class="btn btn-save" id="opsBtnSave">
                             <i class="fa-solid fa-floppy-disk me-1"></i> Save
                         </button>
-                        <a href="operations-ncrs.html" class="btn btn-light">Cancel</a>
+                        <a href="view-ncr.html" class="btn btn-light">Cancel</a>
                     </div>
                     <div class="d-flex gap-2">
                         <button type="button" class="btn btn-primary" id="opsBtnGoReview">
@@ -616,7 +614,7 @@
             updateNewNcrField();
         });
     </script>
-<script src="js/operation-review.js"></script>
+    <script src="js/operation-review.js"></script>
 </body>
 
 </html>

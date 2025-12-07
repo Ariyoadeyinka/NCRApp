@@ -299,12 +299,19 @@
 
     function prefillOpsManager() {
         const el = q("#opsManager");
+        const dateEl = q("#opsDate");
         if (!el) return;
         if (el.value && el.value.trim() !== "") return;
 
         const name = getCurrentUserDisplayName();
         if (name) {
             el.value = name;
+        }
+
+        // ---- Prefill Ops Manager Date (today) ----
+        if (dateEl && (!dateEl.value || dateEl.value.trim() === "")) {
+            const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+            dateEl.value = today;
         }
     }
 

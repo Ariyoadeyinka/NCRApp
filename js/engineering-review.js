@@ -1,6 +1,5 @@
 // js/engineering-review.js
 (function () {
-    // --- NEW: same constants style as Quality page --- (if you need Supabase URL/KEY here, add like in other files)
     const q = (sel) => document.querySelector(sel);
     const Q = (sel) => Array.from(document.querySelectorAll(sel));
 
@@ -8,7 +7,7 @@
     let currentNcrNumber = ""; // store NCR number for notifications
     let currentSession = null; // store supabase session so we can read user id
 
-    // --- Notifications (same as before) ---
+    // ---------- Notifications ----------
 
     async function createNotificationRow(payload) {
         try {
@@ -42,6 +41,63 @@
             });
         } catch (error) {
             console.warn("Failed to insert Operations notification", error);
+        }
+    }
+
+    // 🔔 NEW: notify NCR department + Quality when Engineering closes an NCR
+    async function notifyClosedFromEngineering(ncrId) {
+        if (!window.NCR?.auth?.client) {
+            console.warn("[eng] Auth client not available; cannot send closed notification.");
+            return;
+        }
+
+        const client = window.NCR.auth.client;
+        const sessionUserId = currentSession?.user?.id ?? null;
+
+        let ncrNoLabel = currentNcrNumber || `#${ncrId}`;
+
+        // If we don't already know the NCR number, try to fetch it
+        if (!currentNcrNumber) {
+            try {
+                const { data, error } = await client
+                    .from("ncrs")
+                    .select("ncr_no")
+                    .eq("id", ncrId)
+                    .single();
+
+                if (!error && data?.ncr_no) {
+                    ncrNoLabel = data.ncr_no;
+                }
+            } catch (e) {
+                console.warn("[eng] Could not fetch NCR number for closed notification:", e);
+            }
+        }
+
+        const actorName =
+            getCurrentUserDisplayNameFromMetadata() || "Engineer";
+        const baseMessage = `NCR ${ncrNoLabel} has been closed in Engineering by ${actorName}.`;
+        const link = `view-ncr.html?id=${encodeURIComponent(ncrId)}`;
+
+        const basePayload = {
+            ncr_id: Number(ncrId),
+            type: "ncr_closed",
+            message: baseMessage,
+            link,
+            created_by: sessionUserId
+        };
+
+        try {
+            await createNotificationRow({
+                ...basePayload,
+                recipient_role: "ncr_department"
+            });
+            await createNotificationRow({
+                ...basePayload,
+                recipient_role: "quality"
+            });
+            console.log("[eng] closed notifications sent to NCR + Quality");
+        } catch (err) {
+            console.warn("[eng] notifyClosedFromEngineering failed:", err);
         }
     }
 
@@ -193,10 +249,8 @@
             if (meta.first_name || meta.last_name) {
                 return `${meta.first_name || ""} ${meta.last_name || ""}`.trim();
             }
-            // we intentionally do NOT fall back to email
         }
 
-        // localStorage fallbacks (if you stored something there elsewhere)
         try {
             const rawProfile = localStorage.getItem("cf_user_profile");
             if (rawProfile) {
@@ -216,10 +270,8 @@
     }
 
     async function resolveEngineerName() {
-        // 1) session metadata / local storage
         let name = getCurrentUserDisplayNameFromMetadata();
 
-        // 2) profiles table fallback using full_name ONLY (matches your schema)
         if (!name && window.NCR?.auth?.client && currentSession?.user?.id) {
             try {
                 const client = window.NCR.auth.client;
@@ -227,7 +279,7 @@
                     .from("profiles")
                     .select("full_name")
                     .eq("id", currentSession.user.id)
-                    .maybeSingle(); // returns null if no row
+                    .maybeSingle();
 
                 if (!error && data && data.full_name) {
                     name = data.full_name;
@@ -247,7 +299,6 @@
         const el = q("#engName");
         if (!el) return;
 
-        // If already filled from DB load, just lock it
         if (el.value && el.value.trim() !== "") {
             el.readOnly = true;
             return;
@@ -258,11 +309,10 @@
             el.value = name.trim();
         }
 
-        // always read-only for user
         el.readOnly = true;
     }
 
-    // ---------- Load NCR (quality-ish header info) ----------
+    // ---------- Load NCR (header) ----------
 
     async function loadNcr() {
         if (!window.NCR?.auth?.client) {
@@ -293,13 +343,6 @@
 
             const n = data;
             currentStage = (n.current_stage || "").toLowerCase();
-
-            if (currentStage !== "engineering" && currentStage !== "operations") {
-                console.warn(
-                    "NCR current_stage is neither engineering nor operations:",
-                    n.current_stage
-                );
-            }
 
             const mapping = {
                 ncrNo: n.ncr_no || "",
@@ -598,7 +641,7 @@
 
         await loadNcr();
         await loadEngineering();
-        await prefillEngineerName(); // 🔥 fill & lock engineer name here
+        await prefillEngineerName();
 
         const btnSave = q("#btnSave");
         if (btnSave) {
@@ -720,20 +763,15 @@
                         const client = window.NCR.auth.client;
                         const ncrId = Number(readQueryId());
 
-                        // 1) Save engineering info
                         try {
                             await upsertEngineering("draft");
-                        } catch (_) {
-                            // ignore if no existing row
-                        }
+                        } catch (_) { }
 
-                        // 2) Call your Postgres function
                         const { error } = await client.rpc("forward_to_operations", {
                             p_ncr_id: ncrId,
                         });
                         if (error) throw error;
 
-                        // 3) HARD-SET stage to Operations on the NCR row
                         await client
                             .from("ncrs")
                             .update({
@@ -745,7 +783,6 @@
                             })
                             .eq("id", ncrId);
 
-                        // 4) Create notification for Operations
                         await createOperationsNotification(ncrId, currentNcrNumber);
 
                         showSuccessModal(
@@ -769,6 +806,7 @@
             }
         }
 
+        // 🔥 Close NCR from Engineering + send notifications
         const btnClose = q("#btnCloseNcr");
         if (btnClose) {
             btnClose.addEventListener("click", async (e) => {
@@ -791,6 +829,12 @@
                     } catch (_) { }
 
                     await closeNcrInEngineering();
+
+                    const id = Number(readQueryId());
+                    if (!Number.isNaN(id)) {
+                        await notifyClosedFromEngineering(id);
+                    }
+
                     reflectClosedInUI();
 
                     showSuccessModal(
