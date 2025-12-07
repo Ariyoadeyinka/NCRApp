@@ -1,8 +1,51 @@
+// js/engineering-review.js
 (function () {
+    // --- NEW: same constants style as Quality page --- (if you need Supabase URL/KEY here, add like in other files)
     const q = (sel) => document.querySelector(sel);
     const Q = (sel) => Array.from(document.querySelectorAll(sel));
 
     let currentStage = "engineering";
+    let currentNcrNumber = ""; // store NCR number for notifications
+    let currentSession = null; // store supabase session so we can read user id
+
+    // --- Notifications (same as before) ---
+
+    async function createNotificationRow(payload) {
+        try {
+            if (!window.NCR?.auth?.client) return;
+            const client = window.NCR.auth.client;
+            const { error } = await client
+                .from("ncr_notifications")
+                .insert(payload);
+            if (error) {
+                console.warn("eng failed to create notification", error);
+            } else {
+                console.log("eng created notification:", payload);
+            }
+        } catch (err) {
+            console.warn("eng createNotificationRow threw:", err);
+        }
+    }
+
+    async function createOperationsNotification(ncrId, ncrNumber) {
+        const displayNumber = ncrNumber || ncrId;
+        const message = `NCR #${displayNumber} has been sent to Procurement for review.`;
+        const link = `view-ncr.html?id=${encodeURIComponent(ncrId)}`;
+
+        try {
+            await createNotificationRow({
+                ncr_id: ncrId,
+                message,
+                type: "stage_change",
+                recipient_role: "operations",
+                link,
+            });
+        } catch (error) {
+            console.warn("Failed to insert Operations notification", error);
+        }
+    }
+
+    // ---------- Generic helpers ----------
 
     function showConfirmModal(title, body, yesLabel) {
         return new Promise((resolve) => {
@@ -137,6 +180,90 @@
         });
     }
 
+    // ---------- Engineer name helpers ----------
+
+    function getCurrentUserDisplayNameFromMetadata() {
+        if (currentSession && currentSession.user) {
+            const u = currentSession.user;
+            const meta = u.user_metadata || {};
+
+            if (meta.full_name) return meta.full_name;
+            if (meta.name) return meta.name;
+            if (meta.display_name) return meta.display_name;
+            if (meta.first_name || meta.last_name) {
+                return `${meta.first_name || ""} ${meta.last_name || ""}`.trim();
+            }
+            // we intentionally do NOT fall back to email
+        }
+
+        // localStorage fallbacks (if you stored something there elsewhere)
+        try {
+            const rawProfile = localStorage.getItem("cf_user_profile");
+            if (rawProfile) {
+                const p = JSON.parse(rawProfile);
+                if (p.full_name) return p.full_name;
+                if (p.name) return p.name;
+            }
+        } catch {
+            // ignore
+        }
+
+        const alt =
+            localStorage.getItem("cf_user_name") ||
+            localStorage.getItem("cf_full_name") ||
+            "";
+        return alt;
+    }
+
+    async function resolveEngineerName() {
+        // 1) session metadata / local storage
+        let name = getCurrentUserDisplayNameFromMetadata();
+
+        // 2) profiles table fallback using full_name ONLY (matches your schema)
+        if (!name && window.NCR?.auth?.client && currentSession?.user?.id) {
+            try {
+                const client = window.NCR.auth.client;
+                const { data, error } = await client
+                    .from("profiles")
+                    .select("full_name")
+                    .eq("id", currentSession.user.id)
+                    .maybeSingle(); // returns null if no row
+
+                if (!error && data && data.full_name) {
+                    name = data.full_name;
+                } else if (error) {
+                    console.warn("[eng] profiles lookup error:", error);
+                }
+            } catch (e) {
+                console.warn("[eng] profiles lookup threw:", e);
+            }
+        }
+
+        console.log("[eng] resolved engineer name:", name);
+        return name || "";
+    }
+
+    async function prefillEngineerName() {
+        const el = q("#engName");
+        if (!el) return;
+
+        // If already filled from DB load, just lock it
+        if (el.value && el.value.trim() !== "") {
+            el.readOnly = true;
+            return;
+        }
+
+        const name = await resolveEngineerName();
+        if (name && name.trim()) {
+            el.value = name.trim();
+        }
+
+        // always read-only for user
+        el.readOnly = true;
+    }
+
+    // ---------- Load NCR (quality-ish header info) ----------
+
     async function loadNcr() {
         if (!window.NCR?.auth?.client) {
             showError("Auth client not available. Please sign in again.");
@@ -188,6 +315,8 @@
                 soNo: n.so_no || "",
                 isNc: n.is_nc ? "Yes" : "No",
             };
+
+            currentNcrNumber = mapping.ncrNo || "";
 
             Q('input[data-source="quality"]').forEach((input) => {
                 const field = input.dataset.field;
@@ -243,6 +372,8 @@
         }
     }
 
+    // ---------- Engineering form ----------
+
     function readEngForm() {
         return {
             disposition: readRadio("disp") || null,
@@ -281,7 +412,10 @@
         }
 
         if (!model.drawing_update_required && revAny) {
-            showFieldError(revAny, "Please indicate if drawing update is required.");
+            showFieldError(
+                revAny,
+                "Please indicate if drawing update is required."
+            );
             valid = false;
         } else if (revAny) {
             clearFieldError(revAny);
@@ -450,6 +584,8 @@
         q("#stepLabelForm")?.classList.add("eng-step-active");
     }
 
+    // ---------- Wiring up page ----------
+
     document.addEventListener("DOMContentLoaded", async () => {
         if (!window.NCR?.auth?.requireLogin) {
             console.error("Auth module not loaded, redirecting to login.");
@@ -458,9 +594,11 @@
         }
         const session = await window.NCR.auth.requireLogin();
         if (!session) return;
+        currentSession = session;
 
         await loadNcr();
         await loadEngineering();
+        await prefillEngineerName(); // 🔥 fill & lock engineer name here
 
         const btnSave = q("#btnSave");
         if (btnSave) {
@@ -579,16 +717,36 @@
                         '<span class="spinner-border spinner-border-sm me-1"></span> Forwarding…';
 
                     try {
+                        const client = window.NCR.auth.client;
+                        const ncrId = Number(readQueryId());
+
+                        // 1) Save engineering info
                         try {
                             await upsertEngineering("draft");
-                        } catch (_) { }
+                        } catch (_) {
+                            // ignore if no existing row
+                        }
 
-                        const ncrId = Number(readQueryId());
-                        const { error } =
-                            await window.NCR.auth.client.rpc("forward_to_operations", {
-                                p_ncr_id: ncrId,
-                            });
+                        // 2) Call your Postgres function
+                        const { error } = await client.rpc("forward_to_operations", {
+                            p_ncr_id: ncrId,
+                        });
                         if (error) throw error;
+
+                        // 3) HARD-SET stage to Operations on the NCR row
+                        await client
+                            .from("ncrs")
+                            .update({
+                                current_stage: "operations",
+                                whose_turn_dept: "operations",
+                                next_up_dept: "operations",
+                                status: "open",
+                                updated_at: new Date().toISOString(),
+                            })
+                            .eq("id", ncrId);
+
+                        // 4) Create notification for Operations
+                        await createOperationsNotification(ncrId, currentNcrNumber);
 
                         showSuccessModal(
                             "Forwarded",

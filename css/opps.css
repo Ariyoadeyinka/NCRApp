@@ -1,0 +1,156 @@
+/* Operations layout polish */
+.ops-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #6c757d;
+    margin-bottom: .5rem;
+}
+
+.ops-section {
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid rgba(23, 52, 81, 0.08);
+}
+
+.ops-section:last-of-type {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.ops-help {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.ops-label-strong {
+    font-weight: 600;
+}
+
+/* Slightly tighter radios/checkboxes for a corporate look */
+.form-check-inline .form-check-input {
+    margin-top: 0.1rem;
+}
+
+/* --- GLOBAL COMPACT MODE FOR OPERATIONS FORM --- */
+#opsForm,
+#opsStepForm,
+#operationsSection {
+    --cf-gap-small: 0.35rem;
+    --cf-gap-medium: 0.5rem;
+    --cf-gap-large: 0.75rem;
+}
+
+/* Tighten section padding */
+#opsStepForm .card-body {
+    padding: 1rem 1.25rem !important;
+}
+
+#opsStepForm .card-header {
+    padding: 0.75rem 1rem !important;
+}
+
+#opsStepForm .card-footer {
+    padding: 0.75rem 1rem !important;
+}
+
+/* Reduce spacing between rows */
+#opsStepForm .row {
+    margin-bottom: var(--cf-gap-medium) !important;
+}
+
+/* Reduce Bootstrap gutter space */
+#opsStepForm .row.g-3,
+#opsStepForm .row.g-4 {
+    --bs-gutter-y: var(--cf-gap-small);
+    --bs-gutter-x: 1rem;
+}
+
+/* Make labels tighter */
+#opsStepForm .form-label {
+    margin-bottom: 0.2rem !important;
+    font-size: 0.85rem;
+}
+
+/* Make form controls smaller */
+#opsStepForm .form-control {
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.85rem;
+}
+
+/* Make the textarea match the compact size */
+#opsStepForm textarea.form-control {
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.85rem;
+}
+
+/* Compact radio/btn groups */
+#opsStepForm .btn-group .btn {
+    padding: 0.35rem 0.8rem !important;
+    font-size: 0.85rem !important;
+}
+
+#opsStepForm .btn-group {
+    margin-top: 0 !important;
+}
+
+/* Reduce spacing between logical form groups */
+#opsStepForm .mb-3,
+#opsStepForm .mb-4 {
+    margin-bottom: var(--cf-gap-medium) !important;
+}
+
+/* Make HR tighter */
+#opsStepForm hr {
+    margin: 0.75rem 0 !important;
+}
+
+.hidden-field {
+    display: none !important;
+}
+
+/* Reduce vertical spacing between form groups */
+.ops-section .row.g-3 {
+    margin-bottom: 0.5rem !important;
+}
+
+/* Reduce top spacing of labels */
+.ops-section .form-label {
+    margin-bottom: 2px !important;
+}
+
+/* Make input fields slightly shorter */
+.ops-section .form-control {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
+    height: 36px !important;
+}
+
+/* Make radio button groups tighter */
+.ops-section .btn-group .btn {
+    padding: 0.3rem 0.75rem !important;
+    font-size: 0.85rem !important;
+}
+
+/* Reduce spacing below button groups */
+.ops-section .btn-group {
+    margin-bottom: 0.25rem !important;
+}
+
+/* Reduce spacing for conditional fields */
+.ops-section .hidden-field {
+    margin-top: 0.25rem !important;
+}
+
+/* Reduce row gap for conditional (follow-up) fields */
+.ops-section #followupContainer .row {
+    margin-top: 0.25rem !important;
+    margin-bottom: 0 !important;
+}
+
+/* Reduce spacing between inputs inside grid */
+.ops-section .row.g-2 {
+    gap: 0.35rem !important;
+}

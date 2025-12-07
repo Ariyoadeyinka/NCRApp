@@ -1,23 +1,25 @@
-// js/view-ncr.js (or engineering-ncrs.js)
+// js/view-ncr.js
 (function () {
   const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
   const SUPABASE_ANON =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlpam5vcXpvYm9jbm9xeHpnY2R5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MTQyODgsImV4cCI6MjA3NTE5MDI4OH0.QL4Ayy5pMcstbmdO4lFsoLP9Qo9KlYemn7FDWPwAHLU";
+
   let currentSession = null;
 
+  // ---------- Auth helpers ----------
   async function authHeaders(extra = {}) {
     if (!currentSession) throw new Error("Not authenticated");
 
     return {
       apikey: SUPABASE_ANON,
-      Authorization: `Bearer ${currentSession.access_token}`, // ✅ user token
+      Authorization: `Bearer ${currentSession.access_token}`, // user token
       Accept: "application/json",
       "Content-Type": "application/json",
       ...extra,
     };
   }
 
-  // ---- role helpers (populated by login.js) ----
+  // ---------- Role helpers (populated by login.js) ----------
   function getRoles() {
     try {
       const raw = localStorage.getItem("cf_roles");
@@ -32,42 +34,42 @@
       return [];
     }
   }
+
   function hasRole(code) {
     return getRoles().includes(code.toLowerCase());
   }
+
   function isAdmin() {
-    try {
-      const urlHasAdmin =
-        new URL(location.href).searchParams.get("admin") === "1";
-      return urlHasAdmin || hasRole("admin");
-    } catch {
-      return hasRole("admin");
-    }
+    return hasRole("admin");
   }
 
+  // Pre-fill status filter from URL if present
   const urlStatus = new URLSearchParams(location.search).get("status");
-  const statusSelect =
+  const statusSelectInit =
     document.getElementById("statusFilter") || document.querySelector("select");
-  if (urlStatus && statusSelect) {
+  if (urlStatus && statusSelectInit) {
     const v = urlStatus.toLowerCase();
     const allowed = new Set(["open", "pending", "closed", "sent_back"]);
-    statusSelect.value = allowed.has(v) ? v : "";
+    statusSelectInit.value = allowed.has(v) ? v : "";
   }
 
   const q = (s) => document.querySelector(s);
   const Q = (s) => Array.from(document.querySelectorAll(s));
 
+  // ---------- Utils ----------
   function fmtDate(d) {
     if (!d) return "";
     const dt = new Date(d);
     if (Number.isNaN(dt.getTime())) return d;
     return dt.toISOString().slice(0, 10);
   }
+
   function titleCase(s) {
     return (s || "")
       .toString()
       .replace(/\w\S*/g, (t) => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase());
   }
+
   function escIlike(term) {
     return term.replace(/[%_]/g, (m) => "\\" + m);
   }
@@ -106,7 +108,7 @@
     return res;
   }
 
-  // ---- helper to create notifications ----
+  // ---------- Notifications ----------
   async function createNcrNotification({ ncrId, type, recipientRole, message, link }) {
     if (!ncrId || !type || !recipientRole || !message) return;
     try {
@@ -134,6 +136,7 @@
     }
   }
 
+  // ---------- Layout helpers ----------
   function ensureListContainer() {
     let list = document.getElementById("ncrList");
     if (!list) {
@@ -153,11 +156,13 @@
         main.appendChild(list);
       }
     }
+    // remove any old static cards below list
     document
       .querySelectorAll("#ncrList ~ .card.p-4.mb-4, .card.p-4.mb-4")
       .forEach((el) => el.remove());
     return list;
   }
+
   function ensurePagerContainer() {
     let pager = document.getElementById("ncrPager");
     if (!pager) {
@@ -171,6 +176,7 @@
     return pager;
   }
 
+  // ---------- Badges / stages ----------
   function statusBadge(status) {
     const s = String(status || "").toLowerCase();
     if (s === "archived") {
@@ -198,7 +204,6 @@
     return map[(s || "").toLowerCase()] || "";
   }
 
-  // Pill that shows the CURRENT stage
   function stagePill(stage) {
     const s = String(stage || "").toLowerCase();
     const COLORS = {
@@ -228,7 +233,7 @@
     return "";
   }
 
-  // ---------- render card ----------
+  // ---------- Card renderer ----------
   function renderCard(n) {
     const supplierName =
       n.suppliers && n.suppliers.name ? n.suppliers.name : "";
@@ -244,24 +249,27 @@
     const isSentBack =
       statusLower === "sent_back" &&
       String(n.current_stage || "").toLowerCase() === "quality";
-    // role flags
-    const engineerOnly = hasRole("engineering") && !isAdmin();
-    const qualityOnly = hasRole("quality") && !hasRole("engineering") && !isAdmin();
-    const adminUser = isAdmin();
 
-    // engineer actions: only when CURRENT stage is engineering (and not draft)
-    // engineer actions: allow on ENGINEERING and OPERATIONS (and not draft)
+    // role flags
+    const adminUser = isAdmin();
+    const engineerOnly = hasRole("engineering") && !adminUser;
+    const qualityOnly =
+      hasRole("quality") && !engineerOnly && !adminUser;
+    const operationsOnly =
+      (hasRole("operations") || hasRole("production")) &&
+      !engineerOnly &&
+      !qualityOnly &&
+      !adminUser;
+
     const currentStage = String(n.current_stage || "").toLowerCase();
     const isCurrentEngineering = currentStage === "engineering";
     const isCurrentOperations = currentStage === "operations";
-
-
     const isClosed = statusLower === "closed";
 
     let actionsHtml = "";
-    if (engineerOnly && !adminUser) {
 
-      // ENGINEERING stage, not draft & not closed → View + Review + Send Back
+    // 👷 ENGINEERING
+    if (engineerOnly) {
       if (isCurrentEngineering && !isDraft && !isClosed) {
         actionsHtml += `
       <button class="btn btn-outline-primary" data-action="view"
@@ -273,38 +281,8 @@
       </button>
       <button class="btn btn-outline-secondary btn-sm" data-action="sendBack">
         <i class="bi bi-arrow-return-left"></i> Send Back
-      </button>
-    `;
-      }
-
-      // ENGINEERING stage but CLOSED → View + Edit (no Send Back)
-      else if (isCurrentEngineering && isClosed) {
-        actionsHtml += `
-      <button class="btn btn-outline-primary" data-action="view"
-              style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
-        <i class="fa fa-eye me-1"></i> View
-      </button>
-      <button class="btn btn-dark" data-action="review">
-        <i class="fa fa-pen me-1"></i> Edit
-      </button>
-    `;
-      }
-
-      // OPERATIONS stage → View + Edit
-      else if (isCurrentOperations && !isDraft) {
-        actionsHtml += `
-      <button class="btn btn-outline-primary" data-action="view"
-              style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
-        <i class="fa fa-eye me-1"></i> View
-      </button>
-      <button class="btn btn-dark" data-action="review">
-        <i class="fa fa-pen me-1"></i> Edit
-      </button>
-    `;
-      }
-
-      // Everything else → View only
-      else {
+      </button>`;
+      } else {
         actionsHtml += `
       <button class="btn btn-outline-primary" data-action="view"
               style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
@@ -312,9 +290,9 @@
       </button>`;
       }
 
-    } else if (qualityOnly && !adminUser) {
+      // 👩‍🔬 QUALITY
+    } else if (qualityOnly) {
       if (isDraft || isSentBack) {
-        // quality can continue editing drafts and sent-back NCRs
         actionsHtml += `
           <a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
             <i class="fa fa-play me-1"></i> Continue
@@ -324,16 +302,33 @@
           <button class="btn btn-outline-primary" data-action="view"
                   style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
             <i class="fa fa-eye me-1"></i> View
-          </button>
-          <button class="btn btn-outline-dark" data-action="edit">
-            <i class="fa fa-pen me-1"></i> Edit
-          </button>
-          <button class="btn btn-outline-secondary btn-sm" data-action="archive">
-            <i class="bi bi-archive"></i> Archive
           </button>`;
       }
+
+      // 🏭 OPERATIONS
+    } else if (operationsOnly) {
+      if (isCurrentOperations && !isDraft && !isClosed) {
+        actionsHtml += `
+          <button class="btn btn-outline-primary" data-action="view"
+                  style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+            <i class="fa fa-eye me-1"></i> View
+          </button>
+          <button class="btn btn-dark" data-action="review">
+            <i class="fa fa-clipboard-check me-1"></i> Review
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" data-action="sendBack">
+            <i class="bi bi-arrow-return-left"></i> Send Back
+          </button>`;
+      } else {
+        actionsHtml += `
+          <button class="btn btn-outline-primary" data-action="view"
+                  style="--bs-btn-color:#173451;--bs-btn-border-color:#173451;--bs-btn-hover-bg:#173451;--bs-btn-hover-border-color:#173451;--bs-btn-active-bg:#12253A;--bs-btn-active-border-color:#12253A;">
+            <i class="fa fa-eye me-1"></i> View
+          </button>`;
+      }
+
+      // 🛡 ADMIN
     } else {
-      // admin / others
       if (isDraft || isSentBack) {
         actionsHtml += `
           <a class="btn btn-primary" data-action="continue" href="create-ncr.html?ncrId=${n.id}">
@@ -391,57 +386,97 @@
 </div>`;
   }
 
+  // ---------- Data load ----------
   async function fetchPageNCRs({ page, pageSize, searchTerm, statusFilter, adminVisible }) {
     const base = `${SUPABASE_URL}/rest/v1/ncrs`;
     const select =
       "id,ncr_no,status,product_no,so_no,qty_defective,qty_supplied,rep_name,wip,date_raised,date_closed,defect_desc,is_nc,supplier_id,created_at,updated_at,archived,current_stage,next_up_dept,whose_turn_dept,suppliers(name)";
-    const qs = new URLSearchParams({
-      select,
-      order: "id.desc",
-      limit: String(pageSize),
-      offset: String((page - 1) * pageSize),
+
+    const qs = new URLSearchParams();
+    qs.set("select", select);
+    qs.set("order", "created_at.desc"); // oldest first by created_at
+
+    qs.set("limit", String(pageSize));
+    qs.set("offset", String((page - 1) * pageSize));
+
+    // ---- Role detection (mutually exclusive view) ----
+    const roles = getRoles().map((r) => r.toLowerCase());
+    const engineerOnly =
+      roles.includes("engineering") &&
+      !roles.includes("quality") &&
+      !roles.includes("operations") &&
+      !roles.includes("production") &&
+      !roles.includes("admin");
+
+    const qualityOnly =
+      roles.includes("quality") &&
+      !roles.includes("engineering") &&
+      !roles.includes("operations") &&
+      !roles.includes("production") &&
+      !roles.includes("admin");
+
+    const operationsOnly =
+      (roles.includes("operations") || roles.includes("production")) &&
+      !roles.includes("engineering") &&
+      !roles.includes("quality") &&
+      !roles.includes("admin");
+
+    const adminOnly =
+      roles.includes("admin") &&
+      !engineerOnly &&
+      !qualityOnly &&
+      !operationsOnly;
+
+    console.log("cf_roles:", roles, {
+      engineerOnly,
+      qualityOnly,
+      operationsOnly,
+      adminOnly,
     });
 
-    const filters = [];
-    const engineer = hasRole("engineering") && !adminVisible;
-    const quality =
-      hasRole("quality") && !hasRole("engineering") && !adminVisible;
+    // ---- Base visibility ----
+    if (!adminOnly) {
+      // Non-admins never see archived
+      qs.set("archived", "is.false");
 
-    if (!adminVisible) {
-      filters.push("archived=is.false");
-
-      if (engineer) {
-        filters.push("or=(current_stage.eq.engineering,current_stage.eq.operations)");
-        filters.push("status=neq.pending");
-        filters.push("status=neq.draft");
-      } else if (quality) {
-
+      if (engineerOnly) {
+        // 👷 Engineering → ONLY items that belong to Engineering
+        qs.set("current_stage", "eq.engineering");
+      } else if (qualityOnly) {
+        // 👩‍🔬 Quality → ONLY Quality items
+        qs.set("current_stage", "eq.quality");
+        qs.set("whose_turn_dept", "eq.quality");
+      } else if (operationsOnly) {
+        // 🏭 Operations → both Operations and Closed
+        qs.set("current_stage", "in.(operations,closed)");
+        // no whose_turn_dept filter so closed items also show
       }
     }
 
+    // ---- Status filter (from dropdown) ----
     if (statusFilter) {
       const statusValues = ["open", "closed", "sent_back", "pending", "draft"];
-
       const stageValues = ["quality", "engineering", "operations"];
 
       if (statusValues.includes(statusFilter)) {
-        filters.push(`status=eq.${encodeURIComponent(statusFilter)}`);
-      }
-      else if (stageValues.includes(statusFilter)) {
-        filters.push(`current_stage=eq.${encodeURIComponent(statusFilter)}`);
+        qs.set("status", `eq.${encodeURIComponent(statusFilter)}`);
+      } else if (stageValues.includes(statusFilter) && adminOnly) {
+        qs.set("current_stage", `eq.${encodeURIComponent(statusFilter)}`);
+        qs.delete("whose_turn_dept");
       }
     }
 
-
+    // ---- Search filter ----
     if (searchTerm) {
       const term = escIlike(searchTerm.trim());
-      filters.push(
-        `or=(ncr_no.ilike.*${term}*,product_no.ilike.*${term}*,so_no.ilike.*${term}*,rep_name.ilike.*${term}*)`
+      qs.set(
+        "or",
+        `(ncr_no.ilike.*${term}*,product_no.ilike.*${term}*,so_no.ilike.*${term}*,rep_name.ilike.*${term}*)`
       );
     }
 
-    for (const f of filters) qs.append("", f);
-    const queryStr = [qs.toString()].concat(filters.map((f) => f)).join("&");
+    const queryStr = qs.toString();
+    console.log("NCR query:", `${base}?${queryStr}`);
 
     const res = await fetchJson(`${base}?${queryStr}`, {
       headers: { Prefer: "count=exact" },
@@ -467,10 +502,9 @@
     return { rows: normalized, total };
   }
 
-
+  // ---------- Mutations ----------
   async function patchNcr(id, payload) {
     const base = `${SUPABASE_URL}/rest/v1/ncrs?id=eq.${encodeURIComponent(id)}`;
-
     const finalUrl = withApiKeyInUrl(base);
     const res = await fetch(finalUrl, {
       method: "PATCH",
@@ -485,14 +519,10 @@
     }
   }
 
-
-
   async function archiveNcr(id) {
     await patchNcr(id, { archived: true });
     return { mode: "archived_flag" };
   }
-
-
 
   async function sendBackToQuality(id, n) {
     const now = new Date().toISOString();
@@ -509,13 +539,14 @@
       ncrId: id,
       type: "sent_back_to_quality",
       recipientRole: "quality",
-      message: `NCR ${n.ncr_no || ""} was sent back to Quality by Engineering for rework.`,
+      message: `NCR ${n.ncr_no || ""} was sent back to Quality for rework.`,
       link: `create-ncr.html?ncrId=${id}&mode=edit`,
     });
 
     return n;
   }
 
+  // ---------- View modal + helper modals ----------
   function ensureViewModal() {
     if (document.getElementById("ncrViewModal")) return;
 
@@ -698,56 +729,31 @@
     const editBtn = q("#vmEdit");
     const arcBtn = q("#vmArchive");
 
-    const engineer = hasRole("engineering") && !isAdmin();
-    const nextDept = computeNextDept(n);
-    const isNextOps = nextDept === "operations";
+    const adminUser = isAdmin();
+    const engineerOnly = hasRole("engineering") && !adminUser;
+    const operationsOnly =
+      (hasRole("operations") || hasRole("production")) && !engineerOnly && !adminUser;
 
     const currentStage = String(n.current_stage || "").toLowerCase();
     const isClosed = s === "closed";
-
-
-
     const statusLower = String(n.status || "").toLowerCase();
     const isDraft = statusLower === "pending" || statusLower === "draft";
 
-    if (engineer && !isClosed && currentStage === "engineering") {
-      editBtn.textContent = "Review";
-    } else {
-      editBtn.textContent = "Edit";
-    }
+    // Default: hide both
+    editBtn.classList.add("d-none");
+    editBtn.onclick = null;
+    arcBtn.classList.add("d-none");
+    arcBtn.onclick = null;
 
-    if (engineer) {
-      if (currentStage === "operations") {
-        editBtn.textContent = "Edit";
-      } else {
+    if (engineerOnly) {
+      if (!isClosed && !isDraft && currentStage === "engineering") {
+        editBtn.classList.remove("d-none");
         editBtn.textContent = "Review";
-      }
-
-      editBtn.onclick = () => {
-        const params = new URLSearchParams({ id: String(n.id) });
-        window.location.href = `engineering-review.html?${params.toString()}`;
-      };
-    } else {
-      editBtn.textContent = "Edit";
-      editBtn.onclick = () => {
-        if (engineer) {
+        editBtn.onclick = () => {
           const params = new URLSearchParams({ id: String(n.id) });
           window.location.href = `engineering-review.html?${params.toString()}`;
-        } else {
-          const paramsObj = {
-            ncrId: String(n.id),
-            mode: "edit",
-            returnTo: "view-ncr.html",
-          };
-          const params = new URLSearchParams(paramsObj);
-          window.location.href = `create-ncr.html?${params.toString()}`;
-        }
-      };
+        };
 
-    }
-
-    if (engineer) {
-      if (currentStage === "engineering" && !isDraft) {
         arcBtn.classList.remove("d-none");
         arcBtn.className = "btn btn-outline-secondary";
         arcBtn.innerHTML =
@@ -769,18 +775,54 @@
             showArchiveError(e);
           }
         };
-      } else {
-        arcBtn.classList.add("d-none");
-        arcBtn.onclick = null;
       }
-    } else {
+    } else if (operationsOnly) {
+      if (!isClosed && !isDraft && currentStage === "operations") {
+        editBtn.classList.remove("d-none");
+        editBtn.textContent = "Review";
+        editBtn.onclick = () => {
+          const params = new URLSearchParams({ id: String(n.id) });
+          window.location.href = `operation-review.html?${params.toString()}`;
+        };
+
+        arcBtn.classList.remove("d-none");
+        arcBtn.className = "btn btn-outline-secondary";
+        arcBtn.innerHTML =
+          '<i class="bi bi-arrow-return-left me-1"></i> Send Back';
+
+        arcBtn.onclick = async () => {
+          const ok = await showSendBackConfirm();
+          if (!ok) return;
+          try {
+            await sendBackToQuality(n.id, n);
+            await showSendBackSuccess(n);
+            bootstrap.Modal.getOrCreateInstance(
+              document.getElementById("ncrViewModal")
+            ).hide();
+            state.needsReload = true;
+            load();
+          } catch (e) {
+            console.error("Send back failed from modal (ops):", e);
+            showArchiveError(e);
+          }
+        };
+      }
+    } else if (adminUser) {
+      editBtn.textContent = "Edit";
+      editBtn.classList.remove("d-none");
+      editBtn.onclick = () => {
+        const paramsObj = {
+          ncrId: String(n.id),
+          mode: "edit",
+          returnTo: "view-ncr.html",
+        };
+        const params = new URLSearchParams(paramsObj);
+        window.location.href = `create-ncr.html?${params.toString()}`;
+      };
+
       arcBtn.classList.remove("d-none");
       arcBtn.className = "btn btn-outline-secondary";
       arcBtn.innerHTML = '<i class="bi bi-archive me-1"></i> Archive';
-
-      if (isNextOps && !isAdmin()) {
-        arcBtn.classList.add("d-none");
-      }
 
       arcBtn.onclick = async () => {
         const ok = await showArchiveConfirm(n);
@@ -800,15 +842,18 @@
     }
   }
 
-
   function showViewModal(n) {
     ensureViewModal();
     fillViewModal(n);
-    bootstrap.Modal.getOrCreateInstance(document.getElementById("ncrViewModal")).show();
+    bootstrap.Modal.getOrCreateInstance(
+      document.getElementById("ncrViewModal")
+    ).show();
   }
+
   function ensureArchiveModals() {
     ensureViewModal();
   }
+
   function showArchiveConfirm() {
     ensureArchiveModals();
     return new Promise((resolve) => {
@@ -836,15 +881,22 @@
       m.show();
     });
   }
+
   function showArchiveSuccess(n) {
     ensureArchiveModals();
     q("#cfArchiveSuccessBody").textContent = `NCR ${n.ncr_no || ""} was archived successfully.`;
-    bootstrap.Modal.getOrCreateInstance(document.getElementById("cfArchiveSuccess")).show();
+    bootstrap.Modal.getOrCreateInstance(
+      document.getElementById("cfArchiveSuccess")
+    ).show();
   }
+
   function showArchiveError(err) {
     ensureArchiveModals();
-    q("#cfArchiveErrorBody").textContent = `Could not archive NCR. ${err && err.message ? err.message : ""}`;
-    bootstrap.Modal.getOrCreateInstance(document.getElementById("cfArchiveError")).show();
+    q("#cfArchiveErrorBody").textContent = `Could not archive NCR. ${err && err.message ? err.message : ""
+      }`;
+    bootstrap.Modal.getOrCreateInstance(
+      document.getElementById("cfArchiveError")
+    ).show();
   }
 
   function ensureSendBackModals() {
@@ -931,9 +983,12 @@
     ensureSendBackModals();
     const body = document.getElementById("cfSendBackSuccessBody");
     body.textContent = `NCR ${n.ncr_no || ""} was sent back to Quality.`;
-    bootstrap.Modal.getOrCreateInstance(document.getElementById("cfSendBackSuccess")).show();
+    bootstrap.Modal.getOrCreateInstance(
+      document.getElementById("cfSendBackSuccess")
+    ).show();
   }
 
+  // ---------- Pager ----------
   function renderPager({ total, page, pageSize }) {
     const pager = ensurePagerContainer();
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -955,7 +1010,10 @@
 
     pager.innerHTML = `
       <div class="text-muted small mb-2 mb-md-0">
-        Showing <strong>${total ? (page - 1) * pageSize + 1 : 0}-${Math.min(page * pageSize, total)}</strong>
+        Showing <strong>${total ? (page - 1) * pageSize + 1 : 0}-${Math.min(
+      page * pageSize,
+      total
+    )}</strong>
         of <strong>${total}</strong>
       </div>
 
@@ -963,25 +1021,32 @@
         <div class="input-group input-group-sm" style="width: 140px;">
           <label class="input-group-text" for="pageSizeSel">Rows</label>
           <select id="pageSizeSel" class="form-select">
-            ${[5, 10, 20, 50].map(
-      (n) => `<option value="${n}" ${n === pageSize ? "selected" : ""}>${n}</option>`
-    ).join("")}
+            ${[5, 10, 20, 50]
+        .map(
+          (n) =>
+            `<option value="${n}" ${n === pageSize ? "selected" : ""
+            }>${n}</option>`
+        )
+        .join("")}
           </select>
         </div>
 
         <nav aria-label="NCR pagination">
           <ul class="pagination pagination-sm mb-0">
             <li class="page-item ${page <= 1 ? "disabled" : ""}">
-              <a class="page-link" href="#" data-page="${page - 1}" aria-label="Previous">&laquo;</a>
+              <a class="page-link" href="#" data-page="${page - 1
+      }" aria-label="Previous">&laquo;</a>
             </li>
             ${pageBtns.join("")}
             <li class="page-item ${page >= totalPages ? "disabled" : ""}">
-              <a class="page-link" href="#" data-page="${page + 1}" aria-label="Next">&raquo;</a>
+              <a class="page-link" href="#" data-page="${page + 1
+      }" aria-label="Next">&raquo;</a>
             </li>
           </ul>
         </nav>
       </div>
     `;
+
     pager.querySelectorAll("a.page-link[data-page]").forEach((a) => {
       a.addEventListener("click", (e) => {
         e.preventDefault();
@@ -991,6 +1056,7 @@
         load();
       });
     });
+
     pager.querySelector("#pageSizeSel")?.addEventListener("change", (e) => {
       const val = parseInt(e.target.value, 10);
       if (!Number.isFinite(val) || val === state.pageSize) return;
@@ -1000,6 +1066,7 @@
     });
   }
 
+  // ---------- State & load ----------
   const state = {
     page: 1,
     pageSize: 10,
@@ -1023,6 +1090,7 @@
     if (statusFilter === "all status" || statusFilter === "") statusFilter = "";
 
     listEl.innerHTML = `<div class="text-muted small py-5 text-center">Loading…</div>`;
+
     try {
       const { rows, total } = await fetchPageNCRs({
         page: state.page,
@@ -1043,7 +1111,8 @@
       listEl.innerHTML = `
         <div class="alert alert-warning" role="alert">
           <div class="fw-semibold mb-1">Couldn’t load NCRs.</div>
-          <div class="small text-muted"><code>${err && err.message ? err.message : String(err)}</code></div>
+          <div class="small text-muted"><code>${err && err.message ? err.message : String(err)
+        }</code></div>
           <div class="small">Check your PostgREST policies and columns (e.g., <code>archived</code> boolean). </div>
         </div>
       `;
@@ -1051,6 +1120,7 @@
     }
   }
 
+  // ---------- DOM ready ----------
   document.addEventListener("DOMContentLoaded", async () => {
     // Require login before showing anything
     if (!window.NCR || !window.NCR.auth || !window.NCR.auth.requireLogin) {
@@ -1062,6 +1132,7 @@
     const session = await window.NCR.auth.requireLogin();
     if (!session) return;
     currentSession = session;
+
     ensureListContainer();
     ensureViewModal();
     ensurePagerContainer();
@@ -1102,7 +1173,10 @@
           await archiveNcr(id);
           await showArchiveSuccess(n);
           const remaining = state.total - 1;
-          const totalPagesAfter = Math.max(1, Math.ceil(remaining / state.pageSize));
+          const totalPagesAfter = Math.max(
+            1,
+            Math.ceil(remaining / state.pageSize)
+          );
           if (state.page > totalPagesAfter) state.page = totalPagesAfter;
           load();
         } catch (err) {
@@ -1119,7 +1193,10 @@
           await sendBackToQuality(id, n);
           await showSendBackSuccess(n);
           const remaining = state.total - 1;
-          const totalPagesAfter = Math.max(1, Math.ceil(remaining / state.pageSize));
+          const totalPagesAfter = Math.max(
+            1,
+            Math.ceil(remaining / state.pageSize)
+          );
           if (state.page > totalPagesAfter) state.page = totalPagesAfter;
           load();
         } catch (err) {
@@ -1147,7 +1224,27 @@
 
       if (action === "review") {
         const params = new URLSearchParams({ id: String(id) });
-        window.location.href = `engineering-review.html?${params.toString()}`;
+        const roles = getRoles().map((r) => r.toLowerCase());
+
+        const engineerOnly =
+          roles.includes("engineering") &&
+          !roles.includes("quality") &&
+          !roles.includes("operations") &&
+          !roles.includes("production") &&
+          !roles.includes("admin");
+
+        const operationsOnly =
+          (roles.includes("operations") || roles.includes("production")) &&
+          !roles.includes("engineering") &&
+          !roles.includes("quality") &&
+          !roles.includes("admin");
+
+        let target = "engineering-review.html";
+        if (operationsOnly) {
+          target = "operation-review.html";
+        }
+
+        window.location.href = `${target}?${params.toString()}`;
         return;
       }
 

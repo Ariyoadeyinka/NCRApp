@@ -1,4 +1,3 @@
-
 (function () {
     const SUPABASE_URL = "https://iijnoqzobocnoqxzgcdy.supabase.co";
     const SUPABASE_ANON =
@@ -109,19 +108,40 @@
 
         let displayRows = [];
         if (!rawRole) {
+            // No role stored, just show everything
             displayRows = rows;
         } else {
             const role = rawRole.toLowerCase();
+
             displayRows = rows.filter((n) => {
                 const rRole = (n.recipient_role || "all").toLowerCase();
+
+                // Always-visible notifications
                 if (rRole === "all") return true;
+
+                // Admin sees everything
                 if (role === "admin") return true;
+
+                // Engineering users
                 if (role.includes("engineer")) {
                     return ["engineering", "engineer", "all"].includes(rRole);
                 }
+
+                // Quality users
                 if (role.includes("quality")) {
                     return ["quality", "quality_control", "all"].includes(rRole);
                 }
+
+                // 🔹 Operations / Procurement / Production users
+                if (
+                    role.includes("operation") ||
+                    role.includes("production") ||
+                    role.includes("procure")
+                ) {
+                    return ["operations", "production", "procurement", "all"].includes(rRole);
+                }
+
+                // Fallback: exact match
                 return rRole === role;
             });
         }
@@ -130,6 +150,7 @@
 
         return { displayRows, readSet };
     }
+
 
     async function loadNotifications() {
         const badge = q("#notifBadge");
